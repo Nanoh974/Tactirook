@@ -8,6 +8,7 @@ import { useChessTrainer } from './useChessTrainer'
 import styles from './App.module.scss'
 
 const files = 'abcdefgh'
+const pieceUrl = (code: string) => `${import.meta.env.BASE_URL}pieces/staunty/${code}.svg`
 const pieceNames: Record<PieceSymbol, string> = {
   k: 'king', q: 'queen', r: 'rook', b: 'bishop', n: 'knight', p: 'pawn',
 }
@@ -155,7 +156,7 @@ function App() {
                     {column === 0 && <span className={`${styles.coordinate} ${styles.rankCoordinate}`}>{rank}</span>}
                     {row === 7 && <span className={`${styles.coordinate} ${styles.fileCoordinate}`}>{file}</span>}
                     {isLegal && <span className={piece ? styles.captureHint : styles.moveHint} />}
-                    {code && <img className={styles.piece} src={`/pieces/staunty/${code}.svg`} alt="" draggable={false} />}
+                    {code && <img className={styles.piece} src={pieceUrl(code)} alt="" draggable={false} />}
                   </button>
                 )
               }))}
@@ -216,7 +217,7 @@ function App() {
         </aside>
       </main>
       <footer className={styles.footer}><span>CHESSTRAINER</span><span>Puzzles from <a href="https://lichess.org" target="_blank" rel="noreferrer">Lichess <ArrowRight size={12} /></a> · <a href="https://github.com/lichess-org/lila/tree/master/public/piece/staunty" target="_blank" rel="noreferrer">Staunty pieces by sadsnake1</a></span></footer>
-      {ghost && <img className={styles.dragGhost} style={{ left: ghost.x, top: ghost.y }} src={`/pieces/staunty/${ghost.piece}.svg`} alt="" />}
+      {ghost && <img className={styles.dragGhost} style={{ left: ghost.x, top: ghost.y }} src={pieceUrl(ghost.piece)} alt="" />}
     </div>
   )
 }
