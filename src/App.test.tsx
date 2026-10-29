@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native'
 import { AccessibilityInfo, Alert, Animated, Dimensions, StyleSheet } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'

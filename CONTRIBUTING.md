@@ -68,10 +68,14 @@ may ask for changes before merging.
 ## Licensing contributions
 
 You retain copyright to your contributions. Unless explicitly documented
-otherwise, contributions are submitted under the project's
-[GPL-3.0-or-later license](./LICENSE). No copyright assignment or separate CLA
-is currently required.
+otherwise, code and documentation contributions are submitted under
+[MPL-2.0](./LICENSE), and original artwork contributions under
+[CC-BY-4.0](./LICENSES/CC-BY-4.0.txt). No copyright assignment or separate CLA
+is currently required. For artwork intended for store builds, explicitly
+confirm permission for any store-required technical protections as described
+in the [artwork notice](./assets/ORIGINAL_ARTWORK_LICENSE.txt); the maintainer's
+additional permission cannot be granted on behalf of other contributors.
 
 Only submit work you have the right to contribute. Preserve third-party license
 notices and document exceptions in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
-The project's GPL does not erase an imported asset's existing license.
+The project licenses do not erase an imported asset's existing license.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { act, renderHook } from '@testing-library/react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import type { Square } from 'chess.js'

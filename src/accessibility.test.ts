@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { boardPalettes } from './boardPalettes'
 import { styles, darkStyles } from './styles'
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import manifest from './puzzleManifest.json'
 import { readSeenPuzzles, seenPuzzlesKey, serializeSeenPuzzles } from './seenPuzzles'

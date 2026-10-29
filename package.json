@@ -1,7 +1,7 @@
 {
   "name": "tactirook",
   "description": "Open-source chess tactics trainer for web, iOS and Android",
-  "license": "GPL-3.0-or-later",
+  "license": "MPL-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Solenia13/ChessTrainer.git"

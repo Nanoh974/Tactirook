@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocalization } from './i18n/LocalizationProvider'
 import { createPreferenceWriter, readPreference } from './preferences'

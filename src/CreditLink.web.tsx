@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { Text, type StyleProp, type TextStyle } from 'react-native'
 
 export function CreditLink({ url, label, textStyle }: { url: string; label: string; textStyle: StyleProp<TextStyle> }) {

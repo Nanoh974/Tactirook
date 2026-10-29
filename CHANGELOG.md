@@ -19,8 +19,11 @@ in Expo/package metadata does not indicate a published store release.
 ### Changed
 
 - Application branding changed from ChessTrainer to Tactirook.
-- Original code and original artwork licensed under GPL-3.0-or-later;
-  third-party notices and licenses preserved.
+- Original code and documentation now use MPL-2.0; original artwork uses
+  CC-BY-4.0, with attribution and an additional app-store permission from
+  the maintainer for artwork they own.
+- Earlier GPL-3.0-or-later grants remain valid for previously distributed
+  copies. Third-party notices and licenses are unchanged.
 
 ### Release status
 

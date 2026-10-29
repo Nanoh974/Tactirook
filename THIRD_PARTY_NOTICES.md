@@ -1,14 +1,18 @@
 # Third-party notices and licensing scope
 
-Tactirook's default project license is [GPL-3.0-or-later](./LICENSE), with
+Tactirook's code and documentation license is [MPL-2.0](./LICENSE), with
 copyright/scope information in [NOTICE](./NOTICE). It does not replace the
 separate licenses below or erase notices in dependencies.
 
 ## Original Tactirook work
 
-The original application code, documentation, icon/logo, supplied piece PNGs,
-Signature SVGs and Atelier SVGs are licensed under GPL-3.0-or-later.
-The original piece sets also carry complete GPL notices in:
+The original application code and documentation are licensed under MPL-2.0.
+The original icon/logo, supplied piece PNGs, Signature SVGs and Atelier SVGs
+are separately licensed under [CC-BY-4.0](./LICENSES/CC-BY-4.0.txt).
+The [artwork notice](./assets/ORIGINAL_ARTWORK_LICENSE.txt) specifies scope,
+attribution, changes and additional permission for store-required technical
+protections on artwork owned by the maintainer. The original piece sets
+also carry the complete artwork notice and license in:
 
 - [`assets/pieces/signature/LICENSE.txt`](./assets/pieces/signature/LICENSE.txt)
 - [`assets/pieces/atelier/LICENSE.txt`](./assets/pieces/atelier/LICENSE.txt)
@@ -57,7 +61,11 @@ compatibility; geometry is unchanged.
 Earlier versions/history included **Staunty by sadsnake1**, under
 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 Those files are not included in the current app. Their original license still
-applies to copies in earlier versions; this GPL change does not relicense them.
+applies to copies in earlier versions; this licensing change does not relicense them.
+
+Earlier copies of original Tactirook work distributed under GPL-3.0-or-later
+remain usable under that grant. The switch to MPL-2.0 / CC-BY-4.0 does not
+revoke rights already granted or depend on whether anyone downloaded a copy.
 
 ## Fonts
 
@@ -81,5 +89,7 @@ Installed packages carry their own upstream notices; do not strip them.
 This file is an asset/source attribution guide, not a claim that every
 platform dependency has been legally audited. Before distributing native
 releases, review the actual bundled dependency and platform notices, preserve
-required texts and satisfy GPL source/distribution obligations. See the
+required texts and satisfy MPL source/distribution and artwork attribution
+obligations. Review store terms and technical protections for each bundled
+asset; the maintainer's permission does not cover third-party assets. See the
 [release checklist](./docs/DEVELOPMENT.md#before-a-mobile-store-release).

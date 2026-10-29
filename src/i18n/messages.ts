@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { english } from './en'
 import { french } from './fr'
 import { spanish } from './es'

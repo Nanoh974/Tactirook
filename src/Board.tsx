@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react'
 import { AccessibilityInfo, Animated, Easing, findNodeHandle, PanResponder, Platform, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
 import type { Color, PieceSymbol, Square } from 'chess.js'

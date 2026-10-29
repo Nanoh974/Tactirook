@@ -1,9 +1,10 @@
+// SPDX-License-Identifier: MPL-2.0
 export const pieceSetNames = ['signature', 'atelier', 'celtic', 'chessnut', 'fantasy', 'spatial'] as const
 export type PieceSet = typeof pieceSetNames[number]
 export const defaultPieceSet: PieceSet = 'atelier'
 export const pieceSets = {
-  signature: { name: 'Signature', author: 'Solenia13', license: 'GPL-3.0-or-later', url: 'https://github.com/Solenia13/ChessTrainer' },
-  atelier: { name: 'Atelier', author: 'Tactirook', license: 'GPL-3.0-or-later', url: 'https://github.com/Solenia13/ChessTrainer' },
+  signature: { name: 'Signature', author: 'Solenia13', license: 'CC-BY-4.0', url: 'https://github.com/Solenia13/ChessTrainer' },
+  atelier: { name: 'Atelier', author: 'Tactirook', license: 'CC-BY-4.0', url: 'https://github.com/Solenia13/ChessTrainer' },
   celtic: { name: 'Celtic', author: 'Maurizio Monge', license: 'MIT', url: 'https://github.com/maurimo/chess-art' },
   chessnut: { name: 'Chessnut', author: 'Alexis Luengas', license: 'Apache 2.0', url: 'https://github.com/LexLuengas/chessnut-pieces' },
   fantasy: { name: 'Fantasy', author: 'Maurizio Monge', license: 'MIT', url: 'https://github.com/maurimo/chess-art' },

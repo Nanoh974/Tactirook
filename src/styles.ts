@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { StyleSheet } from 'react-native'
 
 export const mobileActionBarHeight = 60

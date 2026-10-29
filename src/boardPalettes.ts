@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 export const boardPalettes = {
   brown: { light: '#f2dfbd', dark: '#ae7957', coordinate: '#21140c' },
   blue: { light: '#dbe8f3', dark: '#7999b3', coordinate: '#101d24' },

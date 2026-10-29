@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 const fs = require('node:fs')
 const path = require('node:path')
 const { DOMParser, XMLSerializer } = require('@xmldom/xmldom')
@@ -90,5 +91,5 @@ for (const set of fs.readdirSync(path.join(root, 'assets', 'pieces')).filter((na
 }
 fs.writeFileSync(
   path.join(root, 'src', 'pieceXml.ts'),
-  `// Generated from assets/pieces by npm run generate:pieces.\n// Upstream artwork: CSS/gradient inheritance inlined and IDs prefixed; geometry unchanged.\nexport const pieceXml = ${JSON.stringify(pieces, null, 2)} as const\n\nexport const pieceLicenseTexts = ${JSON.stringify(licenses, null, 2)} as const\n`,
+  `// SPDX-License-Identifier: MPL-2.0\n// Generated from assets/pieces by npm run generate:pieces.\n// Embedded artwork retains its separate licenses in pieceLicenseTexts.\n// Upstream artwork: CSS/gradient inheritance inlined and IDs prefixed; geometry unchanged.\nexport const pieceXml = ${JSON.stringify(pieces, null, 2)} as const\n\nexport const pieceLicenseTexts = ${JSON.stringify(licenses, null, 2)} as const\n`,
 )

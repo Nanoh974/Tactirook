@@ -1,0 +1,31 @@
+Original Tactirook artwork
+Copyright (C) 2026 Julien Sacrez (Solenia13) and Tactirook contributors
+SPDX-License-Identifier: CC-BY-4.0
+
+The original Tactirook artwork is licensed under Creative Commons
+Attribution 4.0 International:
+https://creativecommons.org/licenses/by/4.0/
+The complete legal text is in ../LICENSES/CC-BY-4.0.txt.
+
+Scope: icon.png, icon.svg, icon-app.png, kingW.png, QueenW.png, RookW.png,
+BishopW.png, KnightW.png, PawnW.png, and the Signature and Atelier piece sets.
+This notice does not cover third-party pieces, fonts or puzzle data.
+
+Suggested attribution:
+Tactirook artwork by Julien Sacrez (Solenia13) / Tactirook, CC BY 4.0.
+Source: https://github.com/Solenia13/ChessTrainer
+
+Signature SVGs were vectorized from the supplied original PNGs; black
+variants recolor the same geometry. The vector icon and native icon are
+derived from the original icon.png. Indicate any further changes you make.
+
+For original artwork owned by Julien Sacrez, additional permission is
+granted to include it in app-store binaries subject to store-required
+technical protections, provided the artwork is also made available without
+those protections under CC BY 4.0. Attribution and license notices must
+still be provided. This permission does not apply to third-party material
+or to later contributions unless their rights holders also grant it.
+
+No endorsement by the artist or project is implied. This artwork is
+provided without warranty. Earlier GPL grants remain valid for copies
+distributed under those terms.

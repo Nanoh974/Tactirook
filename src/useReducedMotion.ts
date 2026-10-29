@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { useEffect, useState } from 'react'
 import { AccessibilityInfo, Platform } from 'react-native'
 

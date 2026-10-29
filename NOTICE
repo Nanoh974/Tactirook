@@ -2,22 +2,28 @@ Tactirook
 Copyright (C) 2026 Julien Sacrez (Solenia13) and contributors
 
 Except where a separate license or notice states otherwise, Tactirook's
-original source code, documentation and original artwork are licensed under
-the GNU General Public License, version 3 or (at your option) any later version.
-SPDX-License-Identifier: GPL-3.0-or-later
+original source code and documentation are licensed under the Mozilla Public
+License, version 2.0.
+SPDX-License-Identifier: MPL-2.0
 
-Original artwork includes the Tactirook icon/logo, the six supplied piece PNGs,
-their Signature SVG conversions and recolored variants, and the Atelier set.
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-Tactirook is distributed without any warranty; without even the implied
-warranty of merchantability or fitness for a particular purpose. See LICENSE
-for the complete license.
+Original artwork is separately licensed under CC-BY-4.0. It includes the
+Tactirook icon/logo, the six supplied piece PNGs, their Signature SVG
+conversions and recolored variants, and the Atelier set.
+See assets/ORIGINAL_ARTWORK_LICENSE.txt and LICENSES/CC-BY-4.0.txt.
+
+Tactirook is distributed without warranty. See LICENSE for the complete MPL.
 
 The Expo starter's original MIT notice is preserved in LICENSES/Expo-MIT.txt.
 Lichess puzzles (CC0), third-party chess pieces (MIT / Apache-2.0), fonts
 (OFL-1.1) and dependencies retain their respective licenses and copyrights.
 See THIRD_PARTY_NOTICES.md and the notices stored alongside these assets.
-This project license does not relicense third-party work or remove obligations
-applicable to artwork in earlier commits and releases.
+This change applies to new distributions of work the project has the right
+to license. Copies previously distributed under GPL-3.0-or-later remain
+available under that grant; it is not revoked. Third-party material and
+historical artwork retain their original licenses.
 
 Project source: https://github.com/Solenia13/ChessTrainer

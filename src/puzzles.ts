@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { categories, type Category } from './puzzleThemes'
 export { categories, categoryGroups, type Category } from './puzzleThemes'
 
