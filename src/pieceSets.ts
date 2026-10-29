@@ -3,8 +3,8 @@ export const pieceSetNames = ['signature', 'atelier', 'celtic', 'chessnut', 'fan
 export type PieceSet = typeof pieceSetNames[number]
 export const defaultPieceSet: PieceSet = 'atelier'
 export const pieceSets = {
-  signature: { name: 'Signature', author: 'Solenia13', license: 'CC-BY-4.0', url: 'https://github.com/Solenia13/ChessTrainer' },
-  atelier: { name: 'Atelier', author: 'Tactirook', license: 'CC-BY-4.0', url: 'https://github.com/Solenia13/ChessTrainer' },
+  signature: { name: 'Signature', author: 'Nanoh974', license: 'CC-BY-4.0', url: 'https://github.com/Nanoh974/Tactirook' },
+  atelier: { name: 'Atelier', author: 'Tactirook', license: 'CC-BY-4.0', url: 'https://github.com/Nanoh974/Tactirook' },
   celtic: { name: 'Celtic', author: 'Maurizio Monge', license: 'MIT', url: 'https://github.com/maurimo/chess-art' },
   chessnut: { name: 'Chessnut', author: 'Alexis Luengas', license: 'Apache 2.0', url: 'https://github.com/LexLuengas/chessnut-pieces' },
   fantasy: { name: 'Fantasy', author: 'Maurizio Monge', license: 'MIT', url: 'https://github.com/maurimo/chess-art' },

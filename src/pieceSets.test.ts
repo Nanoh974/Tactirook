@@ -34,6 +34,7 @@ test.each(['signature', 'atelier'] as const)('%s displays the original artwork a
   expect(pieceLicenseTexts[set]).toContain('Suggested attribution:')
   expect(pieceLicenseTexts[set]).toContain('additional permission')
   expect(pieceLicenseTexts[set]).toContain('Solenia13')
+  expect(pieceLicenseTexts[set]).toContain('Nanoh974')
   expect(pieceLicenseTexts[set]).toContain(readFileSync(join(__dirname, '..', 'LICENSES', 'CC-BY-4.0.txt'), 'utf8').trim())
   expect(pieceLicenseTexts[set]).not.toContain('GNU GENERAL PUBLIC LICENSE')
   expect(pieceLicenseTexts[set]).not.toContain('All rights reserved.')

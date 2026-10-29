@@ -1,5 +1,5 @@
 Original Tactirook artwork
-Copyright (C) 2026 Julien Sacrez (Solenia13) and Tactirook contributors
+Copyright (C) 2026 Julien Sacrez (Nanoh974, formerly Solenia13) and Tactirook contributors
 SPDX-License-Identifier: CC-BY-4.0
 
 The original Tactirook artwork is licensed under Creative Commons
@@ -12,8 +12,8 @@ BishopW.png, KnightW.png, PawnW.png, and the Signature and Atelier piece sets.
 This notice does not cover third-party pieces, fonts or puzzle data.
 
 Suggested attribution:
-Tactirook artwork by Julien Sacrez (Solenia13) / Tactirook, CC BY 4.0.
-Source: https://github.com/Solenia13/ChessTrainer
+Tactirook artwork by Julien Sacrez (Nanoh974, formerly Solenia13) / Tactirook, CC BY 4.0.
+Source: https://github.com/Nanoh974/Tactirook
 
 Signature SVGs were vectorized from the supplied original PNGs; black
 variants recolor the same geometry. The vector icon and native icon are

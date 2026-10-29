@@ -16,7 +16,7 @@ attacks, doxxing and deliberate disruption are not acceptable.
 
 ## Reporting concerns
 
-Contact [the maintainer](https://github.com/Solenia13) through a contact method
+Contact [the maintainer](https://github.com/Nanoh974) through a contact method
 they have made public on their GitHub profile. If no private method is available,
 use the repository's question/contact issue form to request a private channel:
 write only that you need private contact, without names, accusations or incident

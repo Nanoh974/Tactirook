@@ -10,17 +10,17 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Solenia13/ChessTrainer/actions/workflows/ci.yml"><img src="https://github.com/Solenia13/ChessTrainer/actions/workflows/ci.yml/badge.svg" alt="CI and web preview"></a>
+  <a href="https://github.com/Nanoh974/Tactirook/actions/workflows/ci.yml"><img src="https://github.com/Nanoh974/Tactirook/actions/workflows/ci.yml/badge.svg" alt="CI and web preview"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/code-MPL--2.0-blue" alt="Code: MPL-2.0"></a>
   <a href="./assets/ORIGINAL_ARTWORK_LICENSE.txt"><img src="https://img.shields.io/badge/artwork-CC--BY--4.0-blue" alt="Original artwork: CC-BY-4.0"></a>
   <img src="https://img.shields.io/badge/status-in%20development-orange" alt="In development">
 </p>
 
 <p align="center">
-  <a href="https://solenia13.github.io/ChessTrainer/">Web preview</a> ·
+  <a href="https://nanoh974.github.io/Tactirook/">Web preview</a> ·
   <a href="#getting-started">Run locally</a> ·
   <a href="./CONTRIBUTING.md">Contribute</a> ·
-  <a href="https://github.com/Solenia13/ChessTrainer/issues">Report a bug</a>
+  <a href="https://github.com/Nanoh974/Tactirook/issues">Report a bug</a>
 </p>
 
 ## Availability
@@ -70,8 +70,8 @@ screenshots of published iOS or Android builds.
 Use **Node.js 24 LTS** and npm. The required version is recorded in [`.nvmrc`](./.nvmrc).
 
 ```sh
-git clone https://github.com/Solenia13/ChessTrainer.git
-cd ChessTrainer
+git clone https://github.com/Nanoh974/Tactirook.git
+cd Tactirook
 npm ci
 npm start
 ```
@@ -100,8 +100,7 @@ npx expo export --platform all
 
 [CI](./.github/workflows/ci.yml) checks types, lint, tests, reproducible artwork
 and the web export on pull requests. Successful pushes to `main` also publish
-the web preview. The repository name and `/ChessTrainer` base path are retained
-for that deployment; the app's public name is **Tactirook**.
+the web preview at the `/Tactirook` base path.
 
 The complete, slower puzzle-data verification can be run with
 `npm run verify:puzzles` or the
@@ -141,7 +140,7 @@ These are development goals, not delivery commitments.
 
 ## Contributing and stewardship
 
-Tactirook is maintained by [Solenia13](https://github.com/Solenia13).
+Tactirook is maintained by [Nanoh974](https://github.com/Nanoh974).
 Bug reports, translations, accessibility feedback and focused pull requests are
 welcome. Start with [CONTRIBUTING.md](./CONTRIBUTING.md); discuss substantial
 changes before implementing them.

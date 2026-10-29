@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native'
-import { AccessibilityInfo, Alert, Animated, Dimensions, StyleSheet } from 'react-native'
+import { AccessibilityInfo, Alert, Animated, Dimensions, Linking, StyleSheet } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { getLocales } from 'expo-localization'
 import App from '../App'
@@ -432,7 +432,10 @@ test.each([375, 1280])('provides a source and license link at width %i', async (
   Dimensions.set({ window: size, screen: size })
   await render(<App />)
   if (width <= 740) await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
-  expect(screen.getByRole('link', { name: 'Source code & licenses' })).toBeTruthy()
+  const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(undefined)
+  await fireEvent.press(screen.getByRole('link', { name: 'Source code & licenses' }))
+  expect(openURL).toHaveBeenCalledWith('https://github.com/Nanoh974/Tactirook')
+  openURL.mockRestore()
 })
 
 test('displays the author and bundled license for each piece set', async () => {
