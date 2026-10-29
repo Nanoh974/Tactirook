@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 const { defineConfig, globalIgnores } = require('eslint/config')
 const expoConfig = require('eslint-config-expo/flat')
 

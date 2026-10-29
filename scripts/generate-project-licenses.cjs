@@ -1,20 +1,20 @@
+// SPDX-License-Identifier: MPL-2.0
 const fs = require('node:fs')
 const path = require('node:path')
 
 const root = path.join(__dirname, '..')
-const license = fs.readFileSync(path.join(root, 'LICENSE'), 'utf8').trim()
-if (!license.includes('GNU GENERAL PUBLIC LICENSE') || !license.includes('Version 3, 29 June 2007')) {
-  throw new Error('Expected the complete GNU GPL version 3 in LICENSE')
+const codeLicense = fs.readFileSync(path.join(root, 'LICENSE'), 'utf8')
+if (!codeLicense.includes('Mozilla Public License Version 2.0') || !codeLicense.includes('Exhibit A')) {
+  throw new Error('Expected the complete Mozilla Public License 2.0 in LICENSE')
 }
-const notice = `Copyright (C) 2026 Julien Sacrez (Solenia13) and Tactirook contributors
-
-This artwork is part of Tactirook, licensed under the GNU General Public
-License, version 3 or (at your option) any later version.
-SPDX-License-Identifier: GPL-3.0-or-later
-
-This artwork is distributed without any warranty. See the license below.
-
-`
+const license = fs.readFileSync(path.join(root, 'LICENSES', 'CC-BY-4.0.txt'), 'utf8').trim()
+if (!license.includes('Attribution 4.0 International') || !license.includes('Section 3')) {
+  throw new Error('Expected the complete Creative Commons Attribution 4.0 license')
+}
+const notice = fs.readFileSync(path.join(root, 'assets', 'ORIGINAL_ARTWORK_LICENSE.txt'), 'utf8').trim()
+if (!notice.includes('SPDX-License-Identifier: CC-BY-4.0')) {
+  throw new Error('Expected the original artwork CC-BY-4.0 notice')
+}
 for (const set of ['signature', 'atelier']) {
-  fs.writeFileSync(path.join(root, 'assets', 'pieces', set, 'LICENSE.txt'), `${notice}${license}\n`)
+  fs.writeFileSync(path.join(root, 'assets', 'pieces', set, 'LICENSE.txt'), `${notice.replace('../LICENSES/', '../../../LICENSES/')}\n\n${license}\n`)
 }

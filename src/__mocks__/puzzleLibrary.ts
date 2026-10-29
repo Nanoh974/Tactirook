@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { createFixturePicker, puzzles } from '../testPuzzleFixtures'
 import manifest from '../puzzleManifest.json'
 

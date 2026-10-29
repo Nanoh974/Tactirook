@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 const fs = require('node:fs')
 const path = require('node:path')
 const { PNG } = require('pngjs')

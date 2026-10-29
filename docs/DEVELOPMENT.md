@@ -44,7 +44,7 @@ node scripts/draw-atelier-pieces.cjs
 # Convert the six original piece PNGs into Signature and rebuild the bundle.
 npm run vectorize:pieces
 
-# Refresh GPL notices for original piece sets and rebuild the bundle.
+# Refresh CC BY 4.0 notices for original piece sets and rebuild the bundle.
 npm run generate:licenses
 
 # Rebuild the runtime bundle after editing any SVG or piece license.
@@ -60,6 +60,8 @@ Commit source artwork, generated SVGs and `src/pieceXml.ts` together.
 Third-party source SVGs stay unchanged; the bundler inlines CSS/gradient
 inheritance and prefixes IDs for React Native/web compatibility.
 Preserve the licenses described in [third-party notices](../THIRD_PARTY_NOTICES.md).
+Original artwork uses CC-BY-4.0; generator code uses MPL-2.0. Embedded artwork
+and data retain their separate licenses even when bundled in a source file.
 
 ## Validation and deployment
 
@@ -93,8 +95,13 @@ The native apps are not published yet. Before release:
   complete native release compliance process.
 - Recheck actual data/network behavior and complete each store's privacy forms.
 - Prepare screenshots, support/privacy URLs, store descriptions and review builds.
-- Verify GPL compliance for the intended distribution channel; if store terms
-  conflict with GPL obligations, resolve the licensing/distribution plan first.
+- Make the source of MPL-covered files in the exact shipped version available
+  under MPL-2.0, including modifications, and tell users where to obtain it.
+  Keep the source/license link working in each distributed build.
+- Include CC BY 4.0 attribution and license information for original artwork,
+  and identify modifications. Make unprotected artwork available when relying
+  on the maintainer's additional app-store permission. Check store/DRM terms
+  against all third-party licenses; this permission does not cover them.
 - Tag a tested release, publish release notes and add only genuine store links.
 
 No signing configuration, store approval or release date is implied by a

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 // Theme identifiers follow https://lichess.org/training/themes (not opening names).
 export const categoryGroups = [
   { label: 'Checkmates', themes: [

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { messages, type MessageKey } from './messages'
 
 export type Language = keyof typeof messages

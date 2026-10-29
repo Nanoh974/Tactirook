@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { categories, categoryGroups } from '../puzzles'
 import { english, messages } from './messages'
 import { groupLabel, themeLabel } from './themes'

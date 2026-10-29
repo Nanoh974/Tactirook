@@ -11,7 +11,8 @@
 
 <p align="center">
   <a href="https://github.com/Solenia13/ChessTrainer/actions/workflows/ci.yml"><img src="https://github.com/Solenia13/ChessTrainer/actions/workflows/ci.yml/badge.svg" alt="CI and web preview"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="GPL-3.0-or-later"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/code-MPL--2.0-blue" alt="Code: MPL-2.0"></a>
+  <a href="./assets/ORIGINAL_ARTWORK_LICENSE.txt"><img src="https://img.shields.io/badge/artwork-CC--BY--4.0-blue" alt="Original artwork: CC-BY-4.0"></a>
   <img src="https://img.shields.io/badge/status-in%20development-orange" alt="In development">
 </p>
 
@@ -150,10 +151,22 @@ maintained builds rather than implying they are official Tactirook releases.
 
 ## License and credits
 
-Tactirook's original code, documentation and artwork are licensed under
-**[GNU GPL version 3 or later](./LICENSE)** (`GPL-3.0-or-later`).
-This includes the Tactirook icon and the Signature and Atelier piece sets.
-See [NOTICE](./NOTICE) for scope and copyright information.
+Tactirook's original code and documentation are licensed under the
+**[Mozilla Public License 2.0](./LICENSE)** (`MPL-2.0`).
+Commercial distribution, including paid applications, is allowed. When
+distributing builds, make the source of MPL-covered files, including your
+modifications, available under the MPL and tell recipients where to find it.
+Separate files in a larger work may use other licenses; MPL does not prevent forks.
+
+The original icon, supplied piece PNGs, Signature and Atelier artwork are
+licensed separately under **[CC BY 4.0](./LICENSES/CC-BY-4.0.txt)**, allowing
+commercial reuse with attribution. See the
+[artwork notice](./assets/ORIGINAL_ARTWORK_LICENSE.txt) for scope, attribution,
+changes and the copyright holder's additional app-store permission.
+See [NOTICE](./NOTICE) for the full licensing scope.
+
+Earlier copies distributed under GPL-3.0-or-later retain that license grant.
+This change does not revoke it or relicense third-party material.
 
 Third-party assets and dependencies **retain their own licenses**:
 

@@ -1,8 +1,22 @@
+// SPDX-License-Identifier: MPL-2.0
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { DOMParser } from '@xmldom/xmldom'
 import { pieceLicenseTexts, pieceXml } from './pieceXml'
 import { isPieceSet, isSavedPieceSet, pieceSetNames, pieceSets } from './pieceSets'
+
+test('keeps the code license separate from the original artwork license', () => {
+  const root = join(__dirname, '..')
+  expect(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).license).toBe('MPL-2.0')
+  expect(JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8')).packages[''].license).toBe('MPL-2.0')
+  expect(readFileSync(join(root, 'LICENSE'), 'utf8')).toContain('Mozilla Public License Version 2.0')
+  const notice = readFileSync(join(root, 'assets', 'ORIGINAL_ARTWORK_LICENSE.txt'), 'utf8')
+  expect(notice).toContain('SPDX-License-Identifier: CC-BY-4.0')
+  expect(notice).toContain('Earlier GPL grants remain valid')
+  for (const set of ['signature', 'atelier'] as const) {
+    expect(pieceLicenseTexts[set]).toContain(notice.replace('../LICENSES/', '../../../LICENSES/').trim())
+  }
+})
 
 test('bundles exactly the available piece sets and their license notices', () => {
   expect(Object.keys(pieceXml).sort()).toEqual([...pieceSetNames].sort())
@@ -14,10 +28,14 @@ test('bundles exactly the available piece sets and their license notices', () =>
   expect(isSavedPieceSet('unknown')).toBe(false)
 })
 
-test.each(['signature', 'atelier'] as const)('%s displays the original artwork GPL grant', (set) => {
-  expect(pieceSets[set].license).toBe('GPL-3.0-or-later')
-  expect(pieceLicenseTexts[set]).toContain('version 3 or (at your option) any later version')
+test.each(['signature', 'atelier'] as const)('%s displays the original artwork attribution grant', (set) => {
+  expect(pieceSets[set].license).toBe('CC-BY-4.0')
+  expect(pieceLicenseTexts[set]).toContain('Attribution 4.0 International')
+  expect(pieceLicenseTexts[set]).toContain('Suggested attribution:')
+  expect(pieceLicenseTexts[set]).toContain('additional permission')
   expect(pieceLicenseTexts[set]).toContain('Solenia13')
+  expect(pieceLicenseTexts[set]).toContain(readFileSync(join(__dirname, '..', 'LICENSES', 'CC-BY-4.0.txt'), 'utf8').trim())
+  expect(pieceLicenseTexts[set]).not.toContain('GNU GENERAL PUBLIC LICENSE')
   expect(pieceLicenseTexts[set]).not.toContain('All rights reserved.')
 })
 
@@ -54,6 +72,6 @@ test.each(pieceSetNames)('%s preserves all twelve source drawings and resolves n
   }
   expect(pieceLicenseTexts[set]).toContain(pieceSets[set].author)
   expect(pieceLicenseTexts[set]).toContain(
-    set === 'signature' || set === 'atelier' ? 'GNU GENERAL PUBLIC LICENSE' : set === 'chessnut' ? 'Apache License' : 'MIT License',
+    set === 'signature' || set === 'atelier' ? 'Attribution 4.0 International' : set === 'chessnut' ? 'Apache License' : 'MIT License',
   )
 })

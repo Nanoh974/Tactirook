@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 export async function readPreference<T extends string>(key: string, isValid: (value: string) => value is T): Promise<T | null> {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { Alert, Platform } from 'react-native'
 
 export function notify(title: string, message: string) {

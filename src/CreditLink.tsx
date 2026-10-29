@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { Linking, Pressable, Text, type StyleProp, type TextStyle } from 'react-native'
 import { useLocalization } from './i18n/LocalizationProvider'
 import { notify } from './notify'

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { Asset } from 'expo-asset'
 import { File } from 'expo-file-system'
 import { Platform } from 'react-native'
