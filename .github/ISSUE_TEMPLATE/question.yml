@@ -1,0 +1,15 @@
+name: Question or contact request
+description: Ask for help or request a private channel.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a private-contact request, write only "Please contact me privately".
+        Do not include incident details, personal information or vulnerability details here.
+        Security vulnerabilities should normally use GitHub private reporting.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question or request
+    validations:
+      required: true

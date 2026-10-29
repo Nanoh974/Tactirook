@@ -1,0 +1,23 @@
+Tactirook
+Copyright (C) 2026 Julien Sacrez (Solenia13) and contributors
+
+Except where a separate license or notice states otherwise, Tactirook's
+original source code, documentation and original artwork are licensed under
+the GNU General Public License, version 3 or (at your option) any later version.
+SPDX-License-Identifier: GPL-3.0-or-later
+
+Original artwork includes the Tactirook icon/logo, the six supplied piece PNGs,
+their Signature SVG conversions and recolored variants, and the Atelier set.
+
+Tactirook is distributed without any warranty; without even the implied
+warranty of merchantability or fitness for a particular purpose. See LICENSE
+for the complete license.
+
+The Expo starter's original MIT notice is preserved in LICENSES/Expo-MIT.txt.
+Lichess puzzles (CC0), third-party chess pieces (MIT / Apache-2.0), fonts
+(OFL-1.1) and dependencies retain their respective licenses and copyrights.
+See THIRD_PARTY_NOTICES.md and the notices stored alongside these assets.
+This project license does not relicense third-party work or remove obligations
+applicable to artwork in earlier commits and releases.
+
+Project source: https://github.com/Solenia13/ChessTrainer

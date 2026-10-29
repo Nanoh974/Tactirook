@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible problem with Tactirook.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For vulnerabilities, use the private security-report link instead.
+        Remove personal information, credentials and private URLs from logs.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Include the commit if running from source.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Web
+        - iOS development build / Expo Go
+        - Android development build / Expo Go
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Device, OS and browser / Expo version
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include the puzzle ID and relevant settings if possible.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Screenshots, logs or accessibility details
+      description: For accessibility issues, include assistive technology and text/motion settings.
