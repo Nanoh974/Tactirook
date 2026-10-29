@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ComponentRef } from 'react'
-import { Alert, BackHandler, Linking, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native'
+import { AccessibilityInfo, BackHandler, findNodeHandle, Image, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native'
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import { useFonts } from 'expo-font'
@@ -15,29 +15,39 @@ import { languages, normalizeSearch } from './src/i18n/translations'
 import { groupLabel, themeLabel } from './src/i18n/themes'
 import { ThemeProvider, useTheme } from './src/ThemeProvider'
 import { boardPaletteNames, boardPalettes } from './src/boardPalettes'
-import { pieceXml } from './src/pieceXml'
+import { pieceLicenseTexts, pieceXml } from './src/pieceXml'
+import { useWebDialog } from './src/useWebDialog'
+import { useWebFocusStyles } from './src/useWebFocusStyles'
+import { notify } from './src/notify'
+import { CreditLink } from './src/CreditLink'
+import { useTrainingSettings } from './src/useTrainingSettings'
+import { pieceSetNames, pieceSets } from './src/pieceSets'
 
 function TrainingApp() {
+  useWebFocusStyles()
   const { language, setLanguage, t, number } = useLocalization()
-  const { theme, setTheme, boardPalette, setBoardPalette, boardPosition, setBoardPosition, allowSeen, setAllowSeen, seenOptionReady } = useTheme()
+  const { theme, setTheme, boardPalette, setBoardPalette, boardPosition, setBoardPosition, allowSeen, setAllowSeen, seenOptionReady, pieceSet, setPieceSet } = useTheme()
   const styles = theme === 'dark' ? darkStyles : lightStyles
   const iconColor = theme === 'dark' ? '#b2d8fa' : '#315a7d'
+  const trainingSettings = useTrainingSettings((kind) => {
+    notify(t(kind === 'load' ? 'trainingSettingsLoadError' : 'trainingSettingsSaveError'), t('tryAgain'))
+  })
+  const { hidePuzzleType, hidePuzzleRating, autoNextPuzzle } = trainingSettings.settings
   const trainer = useChessTrainer(allowSeen, (kind) => {
-    Alert.alert(t(kind === 'load' ? 'seenLoadError' : 'seenSaveError'), t('tryAgain'))
-  }, seenOptionReady)
+    notify(t(kind === 'load' ? 'seenLoadError' : 'seenSaveError'), t('tryAgain'))
+  }, seenOptionReady && trainingSettings.ready, trainingSettings.settings.selectedCategories,
+  (selectedCategories) => trainingSettings.update('selectedCategories', selectedCategories))
   const [selected, setSelected] = useState<Square | null>(null)
   const [trainingOpen, setTrainingOpen] = useState(false)
+  const [pieceLicenseOpen, setPieceLicenseOpen] = useState(false)
   const [themeSearch, setThemeSearch] = useState('')
   const [expandedGroups, setExpandedGroups] = useState<string[]>(['Checkmates'])
-  const [hidePuzzleType, setHidePuzzleType] = useState(false)
-  const [hidePuzzleRating, setHidePuzzleRating] = useState(false)
-  const [autoNextPuzzle, setAutoNextPuzzle] = useState(false)
   const [mobileContentSize, setMobileContentSize] = useState<{ width: number; height: number } | null>(null)
   const trainingButton = useRef<ComponentRef<typeof Pressable>>(null)
-  const firstSetting = useRef<ComponentRef<typeof Pressable>>(null)
-  const restoreTrainingFocus = useRef(false)
+  const closeTrainingButton = useRef<ComponentRef<typeof Pressable>>(null)
+  const wasTrainingOpen = useRef(false)
   const nextPuzzleRef = useRef(trainer.nextPuzzle)
-  const { width, height } = useWindowDimensions()
+  const { width, height, fontScale } = useWindowDimensions()
   const insets = useSafeAreaInsets()
   const compact = width <= 740
   const challengeName = trainer.loading
@@ -50,7 +60,9 @@ function TrainingApp() {
       ? t('typeHidden')
       : categories.filter((category) => trainer.puzzle.themes.includes(category.id)).map(({ id }) => themeLabel(id, language)).join(' · ')
   const mobileContentHeight = mobileContentSize?.height ?? (height - insets.top - 56)
-  const mobileBoardSize = Math.min(mobileContentSize?.width ?? (width - insets.left - insets.right), Math.max(0, mobileContentHeight - insets.bottom - mobileActionBarHeight - mobileFeedbackMinHeight))
+  const scrollMobile = fontScale > 1.2 || mobileContentHeight < 340
+  const availableMobileWidth = mobileContentSize?.width ?? (width - insets.left - insets.right)
+  const mobileBoardSize = Math.min(availableMobileWidth, Math.max(scrollMobile ? 192 : 0, mobileContentHeight - insets.bottom - mobileActionBarHeight - mobileFeedbackMinHeight))
   const mobileBoardTopGap = Math.max(0, (mobileContentHeight - insets.bottom - mobileActionBarHeight - mobileBoardSize) / 2 - 64)
   useEffect(() => {
     nextPuzzleRef.current = trainer.nextPuzzle
@@ -66,29 +78,19 @@ function TrainingApp() {
   useEffect(() => {
     if (!trainingOpen) return
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      setTrainingOpen(false)
+      closeTraining()
       return true
     })
     return () => subscription.remove()
   }, [trainingOpen])
+  useWebDialog(trainingOpen, 'training-menu', 'close-training', true, closeTraining)
   useEffect(() => {
-    if (Platform.OS !== 'web') return
-    if (!trainingOpen) {
-      if (restoreTrainingFocus.current) {
-        trainingButton.current?.focus()
-        restoreTrainingFocus.current = false
-      }
-      return
-    }
-    firstSetting.current?.focus()
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        restoreTrainingFocus.current = true
-        setTrainingOpen(false)
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    if (Platform.OS === 'web') return
+    const shouldRestore = wasTrainingOpen.current && !trainingOpen
+    wasTrainingOpen.current = trainingOpen
+    if (!trainingOpen && !shouldRestore) return
+    const handle = findNodeHandle(trainingOpen ? closeTrainingButton.current : trainingButton.current)
+    if (handle != null) AccessibilityInfo.setAccessibilityFocus(handle)
   }, [trainingOpen])
   const progress = trainer.movesPlayed + (trainer.status === 'success' ? 1 : 0)
   const feedback = trainer.loading
@@ -103,8 +105,16 @@ function TrainingApp() {
         ? [t('wrong'), t('wrongDescription')]
         : trainer.status === 'replying'
           ? [t('replying'), t('replyDescription')]
-          : [t('yourMove'), t('moveDescription')]
+          : [t('yourMove'), `${t('moveDescription')}${Platform.OS === 'web' ? ` ${t('boardKeyboardHelp')}` : ''}`]
   const showFeedbackKing = trainer.enabled && trainer.status !== 'success' && trainer.status !== 'wrong'
+  const previousStatus = useRef(trainer.status)
+  const [feedbackHeading, feedbackDetail] = feedback
+  useEffect(() => {
+    if (Platform.OS === 'ios' && previousStatus.current !== trainer.status) {
+      AccessibilityInfo.announceForAccessibility(`${feedbackHeading} ${feedbackDetail}`)
+    }
+    previousStatus.current = trainer.status
+  }, [trainer.status, feedbackHeading, feedbackDetail])
 
   function next() {
     setSelected(null)
@@ -117,38 +127,38 @@ function TrainingApp() {
   }
 
   function closeTraining() {
-    restoreTrainingFocus.current = true
     setTrainingOpen(false)
   }
 
-  function openLink(url: string) {
-    Linking.openURL(url).catch((error: unknown) => {
-      console.error('Unable to open link', error)
-      Alert.alert(t('linkError'), t('tryAgain'))
-    })
-  }
+  const credits = (
+    <View style={[styles.credits, compact && styles.mobileCredits]}>
+      <Text style={styles.footerText}>{t('puzzlesFrom')}</Text>
+      <CreditLink url="https://lichess.org" label="Lichess" textStyle={[styles.footerText, styles.link]} />
+      <CreditLink url="https://github.com/Solenia13/ChessTrainer" label={t('sourceAndLicenses')} textStyle={[styles.footerText, styles.link]} />
+    </View>
+  )
 
   const training = (
     <View style={styles.trainingContent}>
-      <Text style={styles.settingsHeading}>{t('language')}</Text>
+      <Text accessibilityRole="header" style={styles.settingsHeading}>{t('language')}</Text>
       <View accessibilityRole="radiogroup" accessibilityLabel={t('language')} style={styles.languageOptions}>
-        {languages.map((option, index) => (
+        {languages.map((option) => (
           <Pressable
             key={option.id}
-            ref={index === 0 ? firstSetting : undefined}
             accessibilityRole="radio"
             accessibilityLabel={option.label}
             accessibilityState={{ checked: language === option.id }}
             aria-checked={language === option.id}
+            tabIndex={Platform.OS === 'web' ? (language === option.id ? 0 : -1) : undefined}
             onPress={() => { setThemeSearch(''); setLanguage(option.id) }}
             style={[styles.languageOption, language === option.id && styles.categoryActive]}
           >
-            <Text style={styles.languageOptionText}>{option.label}</Text>
+            <Text style={styles.languageOptionText}>{language === option.id ? '✓ ' : ''}{option.label}</Text>
           </Pressable>
         ))}
       </View>
       <View style={styles.divider} />
-      <Text style={styles.settingsHeading}>{t('appearance')}</Text>
+      <Text accessibilityRole="header" style={styles.settingsHeading}>{t('appearance')}</Text>
       <View accessibilityRole="radiogroup" accessibilityLabel={t('appearance')} style={styles.languageOptions}>
         {(['light', 'dark'] as const).map((option) => (
           <Pressable
@@ -157,15 +167,16 @@ function TrainingApp() {
             accessibilityLabel={t(option === 'light' ? 'lightTheme' : 'darkTheme')}
             accessibilityState={{ checked: theme === option }}
             aria-checked={theme === option}
+            tabIndex={Platform.OS === 'web' ? (theme === option ? 0 : -1) : undefined}
             onPress={() => setTheme(option)}
             style={[styles.languageOption, theme === option && styles.categoryActive]}
           >
-            <Text style={styles.languageOptionText}>{t(option === 'light' ? 'lightTheme' : 'darkTheme')}</Text>
+            <Text style={styles.languageOptionText}>{theme === option ? '✓ ' : ''}{t(option === 'light' ? 'lightTheme' : 'darkTheme')}</Text>
           </Pressable>
         ))}
       </View>
       <View style={styles.divider} />
-      <Text style={styles.settingsHeading}>{t('boardColor')}</Text>
+      <Text accessibilityRole="header" style={styles.settingsHeading}>{t('boardColor')}</Text>
       <View accessibilityRole="radiogroup" accessibilityLabel={t('boardColor')} style={styles.languageOptions}>
         {boardPaletteNames.map((option) => (
           <Pressable
@@ -174,6 +185,7 @@ function TrainingApp() {
             accessibilityLabel={t(option === 'brown' ? 'boardBrown' : option === 'blue' ? 'boardBlue' : 'boardGreen')}
             accessibilityState={{ checked: boardPalette === option }}
             aria-checked={boardPalette === option}
+            tabIndex={Platform.OS === 'web' ? (boardPalette === option ? 0 : -1) : undefined}
             onPress={() => setBoardPalette(option)}
             style={[styles.languageOption, styles.boardPaletteOption, boardPalette === option && styles.categoryActive]}
           >
@@ -181,14 +193,49 @@ function TrainingApp() {
               <View style={[styles.boardPaletteSquare, { backgroundColor: boardPalettes[option].light }]} />
               <View style={[styles.boardPaletteSquare, { backgroundColor: boardPalettes[option].dark }]} />
             </View>
-            <Text style={styles.languageOptionText}>{t(option === 'brown' ? 'boardBrown' : option === 'blue' ? 'boardBlue' : 'boardGreen')}</Text>
+            <Text style={styles.languageOptionText}>{boardPalette === option ? '✓ ' : ''}{t(option === 'brown' ? 'boardBrown' : option === 'blue' ? 'boardBlue' : 'boardGreen')}</Text>
           </Pressable>
         ))}
       </View>
+      <View style={styles.divider} />
+      <Text accessibilityRole="header" style={styles.settingsHeading}>{t('pieceStyle')}</Text>
+      <View accessibilityRole="radiogroup" accessibilityLabel={t('pieceStyle')} style={styles.languageOptions}>
+        {pieceSetNames.map((option) => (
+          <Pressable
+            key={option}
+            accessibilityRole="radio"
+            accessibilityLabel={pieceSets[option].name}
+            accessibilityState={{ checked: pieceSet === option }}
+            aria-checked={pieceSet === option}
+            tabIndex={Platform.OS === 'web' ? (pieceSet === option ? 0 : -1) : undefined}
+            onPress={() => setPieceSet(option)}
+            style={[styles.languageOption, styles.boardPaletteOption, pieceSet === option && styles.categoryActive]}
+          >
+            <View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <SvgXml xml={pieceXml[option].w.n} width={36} height={36} />
+            </View>
+            <Text style={styles.languageOptionText}>{pieceSet === option ? '✓ ' : ''}{pieceSets[option].name}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <CreditLink
+        url={pieceSets[pieceSet].url}
+        label={`${pieceSets[pieceSet].name} — ${pieceSets[pieceSet].author} (${pieceSets[pieceSet].license})`}
+        textStyle={[styles.footerText, styles.link]}
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: pieceLicenseOpen }}
+        onPress={() => setPieceLicenseOpen((open) => !open)}
+        style={styles.languageOption}
+      >
+        <Text style={styles.languageOptionText}>{t('pieceLicense')}</Text>
+      </Pressable>
+      {pieceLicenseOpen && <Text style={styles.footerText}>{pieceLicenseTexts[pieceSet]}</Text>}
       {compact && (
         <>
           <View style={styles.divider} />
-          <Text style={styles.settingsHeading}>{t('boardPosition')}</Text>
+          <Text accessibilityRole="header" style={styles.settingsHeading}>{t('boardPosition')}</Text>
           <View accessibilityRole="radiogroup" accessibilityLabel={t('boardPosition')} style={styles.languageOptions}>
             {(['center', 'top'] as const).map((option) => (
               <Pressable
@@ -197,28 +244,32 @@ function TrainingApp() {
                 accessibilityLabel={t(option === 'center' ? 'boardPositionCenter' : 'boardPositionTop')}
                 accessibilityState={{ checked: boardPosition === option }}
                 aria-checked={boardPosition === option}
+                tabIndex={Platform.OS === 'web' ? (boardPosition === option ? 0 : -1) : undefined}
                 onPress={() => setBoardPosition(option)}
                 style={[styles.languageOption, boardPosition === option && styles.categoryActive]}
               >
-                <Text style={styles.languageOptionText}>{t(option === 'center' ? 'boardPositionCenter' : 'boardPositionTop')}</Text>
+                <Text style={styles.languageOptionText}>{boardPosition === option ? '✓ ' : ''}{t(option === 'center' ? 'boardPositionCenter' : 'boardPositionTop')}</Text>
               </Pressable>
             ))}
           </View>
         </>
       )}
       <View style={styles.divider} />
-      <Text style={styles.settingsHeading}>{t('puzzleInformation')}</Text>
+      <Text accessibilityRole="header" style={styles.settingsHeading}>{t('puzzleInformation')}</Text>
       <Text style={styles.settingsDescription}>{t('hideDetails')}</Text>
       {([
-        { label: t('hideType'), description: t('hideTypeDescription'), checked: hidePuzzleType, toggle: setHidePuzzleType },
-        { label: t('hideRating'), description: t('hideRatingDescription'), checked: hidePuzzleRating, toggle: setHidePuzzleRating },
+        { label: t('hideType'), description: t('hideTypeDescription'), checked: hidePuzzleType, key: 'hidePuzzleType' },
+        { label: t('hideRating'), description: t('hideRatingDescription'), checked: hidePuzzleRating, key: 'hidePuzzleRating' },
       ] as const).map((setting) => (
         <Pressable
           key={setting.label}
           accessibilityRole="checkbox"
           accessibilityLabel={setting.label}
+          aria-label={Platform.OS === 'web' ? `${setting.label}. ${setting.description}` : undefined}
           accessibilityState={{ checked: setting.checked }}
-          onPress={() => setting.toggle((checked) => !checked)}
+          aria-checked={setting.checked}
+          accessibilityHint={setting.description}
+          onPress={() => trainingSettings.update(setting.key, !setting.checked)}
           style={[styles.settingOption, setting.checked && styles.categoryActive]}
         >
           <View style={styles.categoryText}>
@@ -229,13 +280,16 @@ function TrainingApp() {
         </Pressable>
       ))}
       <View style={styles.divider} />
-      <Text style={styles.settingsHeading}>{t('puzzleFlow')}</Text>
+      <Text accessibilityRole="header" style={styles.settingsHeading}>{t('puzzleFlow')}</Text>
       <Text style={styles.settingsDescription}>{t('flowDescription')}</Text>
       <Pressable
         accessibilityRole="checkbox"
         accessibilityLabel={t('autoAdvanceLabel')}
+        aria-label={Platform.OS === 'web' ? `${t('autoAdvanceLabel')}. ${t('autoAdvanceDescription')}` : undefined}
         accessibilityState={{ checked: autoNextPuzzle }}
-        onPress={() => setAutoNextPuzzle((enabled) => !enabled)}
+        aria-checked={autoNextPuzzle}
+        accessibilityHint={t('autoAdvanceDescription')}
+        onPress={() => trainingSettings.update('autoNextPuzzle', !autoNextPuzzle)}
         style={[styles.settingOption, autoNextPuzzle && styles.categoryActive]}
       >
         <View style={styles.categoryText}>
@@ -245,13 +299,15 @@ function TrainingApp() {
         <View style={[styles.checkbox, autoNextPuzzle && styles.checkboxActive]}><Text style={styles.checkmark}>{autoNextPuzzle ? '✓' : ''}</Text></View>
       </Pressable>
       <View style={styles.divider} />
-      <Text style={styles.settingsHeading}>{t('seenHeading')}</Text>
+      <Text accessibilityRole="header" style={styles.settingsHeading}>{t('seenHeading')}</Text>
       <Text style={styles.settingsDescription}>{t('seenDescription')}</Text>
       <Pressable
         accessibilityRole="checkbox"
         accessibilityLabel={t('allowSeen')}
+        aria-label={Platform.OS === 'web' ? `${t('allowSeen')}. ${t('allowSeenDescription')}` : undefined}
         accessibilityState={{ checked: allowSeen }}
         aria-checked={allowSeen}
+        accessibilityHint={t('allowSeenDescription')}
         onPress={() => setAllowSeen(!allowSeen)}
         style={[styles.settingOption, allowSeen && styles.categoryActive]}
       >
@@ -262,13 +318,13 @@ function TrainingApp() {
         <View style={[styles.checkbox, allowSeen && styles.checkboxActive]}><Text style={styles.checkmark}>{allowSeen ? '✓' : ''}</Text></View>
       </Pressable>
       <View style={styles.languageOptions}>
-        <Pressable accessibilityRole="button" accessibilityLabel={t('resetSeen')} disabled={!trainer.hasPuzzle || trainer.loading} onPress={trainer.resetSeenPuzzles} style={[styles.languageOption, (!trainer.hasPuzzle || trainer.loading) && styles.disabled]}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('resetSeen')} disabled={!trainer.memoryLoaded || trainer.loading} onPress={trainer.resetSeenPuzzles} style={[styles.languageOption, (!trainer.memoryLoaded || trainer.loading) && styles.disabled]}>
           <Text style={styles.languageOptionText}>{t('resetSeen')}</Text>
         </Pressable>
       </View>
-      <Text accessibilityLiveRegion="polite" style={styles.settingsDescription}>{t('seenCount', { count: number(trainer.seenCount) })}</Text>
+      <Text accessibilityLiveRegion="polite" aria-live="polite" style={styles.settingsDescription}>{t('seenCount', { count: number(trainer.seenCount) })}</Text>
       <View style={styles.divider} />
-      <Text style={styles.settingsHeading}>{t('chooseFocus')}</Text>
+      <Text accessibilityRole="header" style={styles.settingsHeading}>{t('chooseFocus')}</Text>
       <Text style={styles.trainingDescription}>{t('focusDescription', { count: number(libraryTotal) })}</Text>
       <TextInput
         accessibilityLabel={t('searchThemes')}
@@ -306,6 +362,7 @@ function TrainingApp() {
               accessibilityRole="button"
               accessibilityLabel={groupLabel(group.label, language)}
               accessibilityState={{ expanded }}
+              aria-expanded={expanded}
               onPress={() => setExpandedGroups((groups) => expanded ? groups.filter((label) => label !== group.label) : [...groups, group.label])}
               style={styles.themeGroupHeader}
             >
@@ -323,8 +380,10 @@ function TrainingApp() {
                     key={category.id}
                     accessibilityRole="checkbox"
                     accessibilityLabel={themeLabel(category.id, language)}
+                    aria-label={Platform.OS === 'web' ? `${themeLabel(category.id, language)}. ${t('puzzlesAvailable', { count: number(count) })}` : undefined}
                     accessibilityHint={t('puzzlesAvailable', { count: number(count) })}
                     accessibilityState={{ checked, disabled: count === 0 }}
+                    aria-checked={checked}
                     disabled={count === 0}
                     onPress={() => { setSelected(null); trainer.toggleCategory(category.id) }}
                     style={[styles.category, checked && styles.categoryActive, count === 0 && styles.disabled]}
@@ -341,9 +400,7 @@ function TrainingApp() {
       })}
       {!categories.some(({ id, label }) => normalizeSearch(themeLabel(id, language)).includes(normalizeSearch(themeSearch)) || normalizeSearch(label).includes(normalizeSearch(themeSearch))) && <Text style={styles.settingsDescription}>{t('noMatches')}</Text>}
       <Text style={styles.selectionNote}>✓  {t('selectedOf', { count: number(trainer.selectedCategories.length), total: number(categories.length) })}</Text>
-      {compact && (
-        <Text style={styles.mobileCredits}>{t('puzzlesFrom')} <Text accessibilityRole="link" style={styles.link} onPress={() => openLink('https://lichess.org')}>Lichess</Text> · <Text accessibilityRole="link" style={styles.link} onPress={() => openLink('https://github.com/lichess-org/lila/tree/master/public/piece/staunty')}>{t('piecesCredit')}</Text></Text>
-      )}
+      {compact && credits}
     </View>
   )
 
@@ -351,21 +408,22 @@ function TrainingApp() {
     <SafeAreaView style={styles.app} edges={['top', 'left', 'right']}>
       <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
       <View
-        aria-hidden={compact && trainingOpen}
-        accessibilityElementsHidden={compact && trainingOpen}
-        importantForAccessibility={compact && trainingOpen ? 'no-hide-descendants' : 'auto'}
-        style={[styles.header, compact && styles.headerCompact]}
+        aria-hidden={trainingOpen}
+        accessibilityElementsHidden={trainingOpen}
+        importantForAccessibility={trainingOpen ? 'no-hide-descendants' : 'auto'}
+        pointerEvents={trainingOpen ? 'none' : 'auto'}
+        style={[styles.header, compact && styles.headerCompact, compact && scrollMobile && { height: 'auto', minHeight: 56 }]}
       >
-        <View style={styles.brand}>
-          <View style={styles.brandMark}><Text style={styles.brandMarkText}>♞</Text></View>
-          {!compact && <Text style={styles.brandText}>chess<Text style={styles.brandLight}>trainer</Text><Text style={styles.accent}>.</Text></Text>}
+        <View accessible accessibilityLabel="Tactirook" style={styles.brand}>
+          <Image aria-hidden testID="brand-icon" source={require('./assets/icon-app.png')} style={styles.brandMark} />
+          {!compact && <Text style={styles.brandText}>Tacti<Text style={styles.brandLight}>rook</Text><Text aria-hidden style={styles.accent}>.</Text></Text>}
         </View>
         {compact && (
           <View style={styles.mobileHeaderInfo}>
-            {trainer.hasPuzzle && <Text style={styles.mobilePuzzleId} numberOfLines={1}>{t('puzzleId', { id: trainer.puzzle.id })}</Text>}
+            {trainer.hasPuzzle && <Text style={styles.mobilePuzzleId} numberOfLines={scrollMobile ? undefined : 1}>{t('puzzleId', { id: trainer.puzzle.id })}</Text>}
             <View style={styles.mobileMetadata}>
-              <Text style={styles.mobilePuzzleDetails} numberOfLines={1}>{challengeName}</Text>
-              {trainer.enabled && !hidePuzzleRating && <Text style={styles.mobilePuzzleRating} numberOfLines={1}>{t('rating', { rating: number(trainer.puzzle.rating) })}</Text>}
+              <Text style={styles.mobilePuzzleDetails} numberOfLines={scrollMobile ? undefined : 1}>{challengeName}</Text>
+              {trainer.enabled && !hidePuzzleRating && <Text style={styles.mobilePuzzleRating} numberOfLines={scrollMobile ? undefined : 1}>{t('rating', { rating: number(trainer.puzzle.rating) })}</Text>}
             </View>
           </View>
         )}
@@ -374,6 +432,7 @@ function TrainingApp() {
           accessibilityRole="button"
           accessibilityLabel={t('training')}
           accessibilityState={{ expanded: trainingOpen }}
+          aria-expanded={trainingOpen}
           onPress={() => setTrainingOpen((open) => !open)}
           style={styles.trainingToggle}
         >
@@ -386,6 +445,7 @@ function TrainingApp() {
       </View>
 
       {compact ? (
+        <ScrollView testID="mobile-scroll" scrollEnabled={scrollMobile} style={styles.mobileScroll} contentContainerStyle={styles.mobileScrollContent}>
         <View
           testID="mobile-content"
           aria-hidden={trainingOpen}
@@ -401,10 +461,10 @@ function TrainingApp() {
           <View testID="mobile-board" style={[styles.mobileBoard, { width: mobileBoardSize }]}>
             {trainer.hasPuzzle && <Board trainer={trainer} selected={selected} setSelected={setSelected} edgeToEdge />}
           </View>
-          <View testID="mobile-feedback" accessibilityLiveRegion="polite" style={styles.mobileFeedback}>
+          <View testID="mobile-feedback" accessibilityLiveRegion="polite" aria-live="polite" style={styles.mobileFeedback}>
             <View testID="feedback-icon" aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.mobileFeedbackIcon, showFeedbackKing && styles.kingIconBackground, trainer.status === 'wrong' && styles.feedbackWrong, trainer.status === 'success' && styles.feedbackSuccess]}>
               {showFeedbackKing
-                ? <SvgXml testID="feedback-king" xml={pieceXml[trainer.side].k} width={34} height={34} />
+                ? <SvgXml testID="feedback-king" xml={pieceXml[pieceSet][trainer.side].k} width={34} height={34} />
                 : <Text style={styles.feedbackIconText}>{trainer.status === 'success' ? '✓' : trainer.status === 'wrong' ? '↻' : '♔'}</Text>}
             </View>
             <View style={styles.mobileFeedbackText}>
@@ -427,6 +487,7 @@ function TrainingApp() {
             </Pressable>
           </View>
         </View>
+        </ScrollView>
       ) : (
       <ScrollView
         aria-hidden={trainingOpen}
@@ -439,7 +500,7 @@ function TrainingApp() {
             <View testID="puzzle-frame" style={styles.boardFrame}>
               <View style={styles.challengeBanner}>
                 <View style={styles.challengeDetails}>
-                  <View style={styles.challengeIcon}><Text style={styles.challengeIconText}>◎</Text></View>
+                  <View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.challengeIcon}><Text style={styles.challengeIconText}>◎</Text></View>
                   <View style={styles.challengeText}>
                     <Text style={styles.currentLabel}>{t('currentChallenge')}</Text>
                     <Text style={styles.challengeName} numberOfLines={2}>
@@ -458,21 +519,21 @@ function TrainingApp() {
                 </View>
               </View>
               <View style={styles.boardLine}>
-                <Text style={styles.boardIcon}>♚</Text>
+                <Text aria-hidden style={styles.boardIcon}>♚</Text>
                 <Text style={styles.boardLineText}>{t('chessPuzzle')}</Text>
                 {trainer.hasPuzzle && <Text style={styles.lineEnd}>#{trainer.puzzle.id}</Text>}
               </View>
               {trainer.hasPuzzle && <Board trainer={trainer} selected={selected} setSelected={setSelected} />}
               <View style={styles.boardLine}>
-                <Text style={styles.boardIcon}>♔</Text>
+                <Text aria-hidden style={styles.boardIcon}>♔</Text>
                 {trainer.hasPuzzle && <Text style={styles.boardLineText}>{t('youPlay', { side: t(trainer.side === 'w' ? 'white' : 'black').toLocaleUpperCase(language) })}</Text>}
                 {trainer.hasPuzzle && !hidePuzzleType && <Text style={styles.lineEnd}>{t('moves', { played: number(Math.min(progress, trainer.playerMoves)), total: number(trainer.playerMoves) })}</Text>}
               </View>
             </View>
-            <View accessibilityLiveRegion="polite" style={[styles.feedback, trainer.status === 'wrong' && styles.feedbackWrong, trainer.status === 'success' && styles.feedbackSuccess]}>
+            <View accessibilityLiveRegion="polite" aria-live="polite" style={[styles.feedback, trainer.status === 'wrong' && styles.feedbackWrong, trainer.status === 'success' && styles.feedbackSuccess]}>
               <View testID="feedback-icon" aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.feedbackIcon, showFeedbackKing && styles.kingIconBackground]}>
                 {showFeedbackKing
-                  ? <SvgXml testID="feedback-king" xml={pieceXml[trainer.side].k} width={28} height={28} />
+                  ? <SvgXml testID="feedback-king" xml={pieceXml[pieceSet][trainer.side].k} width={28} height={28} />
                   : <Text style={styles.feedbackIconText}>{trainer.status === 'success' ? '✓' : trainer.status === 'wrong' ? '↻' : '◎'}</Text>}
               </View>
               <View style={styles.feedbackText}>
@@ -487,17 +548,20 @@ function TrainingApp() {
           </View>
         </View>
         <View style={styles.footer}>
-          <Text style={styles.footerBrand}>CHESSTRAINER</Text>
-          <Text style={styles.footerText}>{t('puzzlesFrom')} <Text accessibilityRole="link" style={styles.link} onPress={() => openLink('https://lichess.org')}>Lichess</Text> · <Text accessibilityRole="link" style={styles.link} onPress={() => openLink('https://github.com/lichess-org/lila/tree/master/public/piece/staunty')}>{t('piecesCredit')}</Text></Text>
+          <Text style={styles.footerBrand}>TACTIROOK</Text>
+          {credits}
         </View>
       </ScrollView>
       )}
 
       {trainingOpen && (
         <>
-          {!compact && <Pressable accessibilityRole="button" accessibilityLabel={t('closeMenu')} onPress={closeTraining} style={styles.menuBackdrop} />}
+          {!compact && <Pressable accessibilityRole="button" accessibilityLabel={t('closeMenu')} aria-hidden tabIndex={-1} onPress={closeTraining} style={styles.menuBackdrop} />}
           <View
             testID="training-menu"
+            role="dialog"
+            aria-modal
+            accessibilityLabel={t('trainingSettings')}
             accessibilityViewIsModal
             onAccessibilityEscape={closeTraining}
             style={[
@@ -510,8 +574,8 @@ function TrainingApp() {
             <View testID="training-menu-header" style={[styles.trainingHeaderContainer, compact && styles.trainingHeaderContainerCompact]}>
               <Text style={styles.kicker}>{t('training').toLocaleUpperCase(language)}  ──</Text>
               <View style={styles.trainingHeader}>
-                <Text style={[styles.trainingTitle, compact && styles.trainingTitleCompact]}>{t('trainingSettings')}<Text style={styles.accent}>.</Text></Text>
-                <Pressable accessibilityRole="button" accessibilityLabel={t('closeSettings')} onPress={closeTraining} style={styles.closeTraining}>
+                <Text accessibilityRole="header" style={[styles.trainingTitle, compact && styles.trainingTitleCompact]}>{t('trainingSettings')}<Text aria-hidden style={styles.accent}>.</Text></Text>
+                <Pressable testID="close-training" ref={closeTrainingButton} accessibilityRole="button" accessibilityLabel={t('closeSettings')} onPress={closeTraining} style={styles.closeTraining}>
                   <Text style={styles.closeTrainingText}>✕</Text>
                 </Pressable>
               </View>

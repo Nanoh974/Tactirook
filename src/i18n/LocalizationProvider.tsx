@@ -1,9 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Alert, AppState, Platform } from 'react-native'
+import { AppState, Platform } from 'react-native'
 import { getLocales } from 'expo-localization'
 import { createPreferenceWriter, readPreference } from '../preferences'
 import { deviceLanguage, isLanguage, translate, type Language } from './translations'
 import type { MessageKey } from './messages'
+import { notify } from '../notify'
 
 const storageKey = 'chesstrainer.language'
 type Localization = {
@@ -33,7 +34,7 @@ export function LocalizationProvider({ children }: { children: ReactNode }) {
     }).catch((error: unknown) => {
       if (!active) return
       console.error('Unable to read language preference', error)
-      Alert.alert(translate(deviceLanguage(getLocales()), 'languageLoadError'), translate(deviceLanguage(getLocales()), 'tryAgain'))
+      notify(translate(deviceLanguage(getLocales()), 'languageLoadError'), translate(deviceLanguage(getLocales()), 'tryAgain'))
     })
     return () => { active = false }
   }, [])
@@ -51,7 +52,7 @@ export function LocalizationProvider({ children }: { children: ReactNode }) {
     updateLanguage(next)
     void writePreference(storageKey, next).catch((error: unknown) => {
       console.error('Unable to save language preference', error)
-      Alert.alert(translate(next, 'languageError'), translate(next, 'tryAgain'))
+      notify(translate(next, 'languageError'), translate(next, 'tryAgain'))
     })
   }, [writePreference])
 

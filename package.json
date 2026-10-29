@@ -1,5 +1,18 @@
 {
-  "name": "chess-trainer-expo",
+  "name": "tactirook",
+  "description": "Open-source chess tactics trainer for web, iOS and Android",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Solenia13/ChessTrainer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Solenia13/ChessTrainer/issues"
+  },
+  "homepage": "https://solenia13.github.io/ChessTrainer/",
+  "engines": {
+    "node": "24.x"
+  },
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
@@ -21,14 +34,17 @@
     "react-native-web": "^0.21.4"
   },
   "devDependencies": {
+    "@xmldom/xmldom": "^0.8.15",
     "@testing-library/react-native": "^14.1.0",
     "@types/jest": "30.0.0",
+    "@types/pngjs": "^6.0.5",
     "@types/react": "~19.3.0",
     "csv-parse": "^6.1.0",
     "eslint": "^9.39.5",
     "eslint-config-expo": "~58.0.4",
     "jest": "~30.5.2",
     "jest-expo": "~58.0.12",
+    "pngjs": "^7.0.0",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -40,6 +56,8 @@
     "lint": "expo lint",
     "test": "jest --runInBand",
     "generate:pieces": "node scripts/generate-pieces.cjs",
+    "generate:licenses": "node scripts/generate-project-licenses.cjs && npm run generate:pieces",
+    "vectorize:pieces": "node scripts/vectorize-signature-pieces.cjs && npm run generate:pieces",
     "import:puzzles": "node scripts/import-puzzles.mjs",
     "verify:puzzles": "node scripts/verify-puzzles.mjs"
   },

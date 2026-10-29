@@ -30,8 +30,15 @@ function setup(puzzle: Puzzle) {
   return game.fen()
 }
 
-export function useChessTrainer(allowSeen = false, reportMemoryError?: (kind: 'load' | 'save') => void, ready = true) {
-  const [selectedCategories, setSelectedCategories] = useState<Category[]>(categories.map(({ id }) => id))
+export function useChessTrainer(
+  allowSeen = false,
+  reportMemoryError?: (kind: 'load' | 'save') => void,
+  ready = true,
+  savedCategories?: Category[],
+  onCategoriesChange?: (categories: Category[]) => void,
+) {
+  const [internalCategories, setSelectedCategories] = useState<Category[]>(categories.map(({ id }) => id))
+  const selectedCategories = savedCategories ?? internalCategories
   const [puzzle, setPuzzle] = useState(initialPuzzle)
   const [fen, setFen] = useState(() => setup(initialPuzzle))
   const [step, setStep] = useState(1)
@@ -41,6 +48,7 @@ export function useChessTrainer(allowSeen = false, reportMemoryError?: (kind: 'l
   const [loading, setLoading] = useState(true)
   const [hasPuzzle, setHasPuzzle] = useState(false)
   const [seenCount, setSeenCount] = useState(0)
+  const [memoryLoaded, setMemoryLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const request = useRef(0)
@@ -76,7 +84,12 @@ export function useChessTrainer(allowSeen = false, reportMemoryError?: (kind: 'l
   }, [])
 
   useEffect(() => {
-    if (ready && selectedRef.current.length) void loadNext(selectedRef.current)
+    if (ready) {
+      const initialCategories = savedCategories ?? selectedRef.current
+      selectedRef.current = initialCategories
+      setSelectedCategories(initialCategories)
+      void loadNext(initialCategories)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready])
 
@@ -114,7 +127,6 @@ export function useChessTrainer(allowSeen = false, reportMemoryError?: (kind: 'l
   }
 
   async function loadNext(selected = selectedCategories) {
-    if (!selected.length) return
     const currentRequest = ++request.current
     clearReply()
     setMotion(null)
@@ -125,6 +137,7 @@ export function useChessTrainer(allowSeen = false, reportMemoryError?: (kind: 'l
         readMemory.current = readSeenPuzzles().then((saved) => {
           seen.current = saved
           setSeenCount(saved.size)
+          setMemoryLoaded(true)
         }).catch((cause: unknown) => {
           readMemory.current = null
           console.error('Unable to read seen puzzles', cause)
@@ -134,6 +147,7 @@ export function useChessTrainer(allowSeen = false, reportMemoryError?: (kind: 'l
       }
       await readMemory.current
       if (request.current !== currentRequest) return
+      if (!selected.length) return
       let index: number | undefined
       const next = await picker.current(selected, hasPuzzleRef.current ? puzzle.id : '', allowSeenRef.current ? new Set() : seen.current, (value) => { index = value })
       if (request.current !== currentRequest) return
@@ -159,6 +173,7 @@ export function useChessTrainer(allowSeen = false, reportMemoryError?: (kind: 'l
     clearReply()
     setSelectedCategories(next)
     selectedRef.current = next
+    onCategoriesChange?.(next)
     setLoading(false)
     setError(null)
     if (ready && next.length && (!hasPuzzleRef.current || !puzzle.themes.some((theme) => next.includes(theme)))) {
@@ -211,7 +226,7 @@ export function useChessTrainer(allowSeen = false, reportMemoryError?: (kind: 'l
   }
 
   return {
-    puzzle, game, side, status, lastMove, motion, selectedCategories, enabled, hasFocus, hasPuzzle, loading, error, seenCount, resetSeenPuzzles,
+    puzzle, game, side, status, lastMove, motion, selectedCategories, enabled, hasFocus, hasPuzzle, loading, error, seenCount, memoryLoaded, resetSeenPuzzles,
     playerMoves, movesPlayed, attemptMove, toggleCategory, selectCategories,
     nextPuzzle: () => { void loadNext() },
     retry: () => { void loadNext() },

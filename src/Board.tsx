@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react'
-import { Animated, Easing, PanResponder, Platform, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
+import { AccessibilityInfo, Animated, Easing, findNodeHandle, PanResponder, Platform, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
 import type { Color, PieceSymbol, Square } from 'chess.js'
 import { SvgXml } from 'react-native-svg'
 import type { MoveMotion, PieceMotion, useChessTrainer } from './useChessTrainer'
@@ -8,6 +8,8 @@ import { useLocalization } from './i18n/LocalizationProvider'
 import type { MessageKey } from './i18n/messages'
 import { useTheme } from './ThemeProvider'
 import { boardPalettes } from './boardPalettes'
+import { useReducedMotion } from './useReducedMotion'
+import { useWebDialog } from './useWebDialog'
 
 const files = 'abcdefgh'
 type Trainer = ReturnType<typeof useChessTrainer>
@@ -23,6 +25,7 @@ function SlidingPieces({ motions, width, side, onComplete }: {
   side: Color
   onComplete: () => void
 }) {
+  const { pieceSet } = useTheme()
   const [progress] = useState(() => new Animated.Value(0))
   useEffect(() => {
     const animation = Animated.timing(progress, {
@@ -61,7 +64,7 @@ function SlidingPieces({ motions, width, side, onComplete }: {
           ],
         }]}
       >
-        <SvgXml xml={pieceXml[piece.color][piece.type]} width="100%" height="100%" />
+        <SvgXml xml={pieceXml[pieceSet][piece.color][piece.type]} width="100%" height="100%" />
       </Animated.View>
     )
   })
@@ -74,18 +77,24 @@ export function Board({ trainer, selected, setSelected, edgeToEdge = false }: {
   edgeToEdge?: boolean
 }) {
   const { t } = useLocalization()
-  const { theme, boardPalette } = useTheme()
+  const { theme, boardPalette, pieceSet } = useTheme()
   const palette = boardPalettes[boardPalette]
   const overlayStyles = theme === 'dark' ? darkOverlayStyles : styles
   const [width, setWidth] = useState(0)
   const [ghost, setGhost] = useState<Ghost | null>(null)
   const [finishedMotion, setFinishedMotion] = useState<MoveMotion | null>(null)
   const [promotion, setPromotion] = useState<{ from: Square; to: Square; fen: string } | null>(null)
+  const [focusedSquare, setFocusedSquare] = useState<Square>(trainer.side === 'w' ? 'a8' : 'h1')
+  const [boardHasFocus, setBoardHasFocus] = useState(false)
   const board = useRef<ComponentRef<typeof View>>(null)
+  const squareRefs = useRef<Partial<Record<Square, ComponentRef<typeof Pressable>>>>({})
+  const promotionQueen = useRef<ComponentRef<typeof Pressable>>(null)
+  const promotionDestination = useRef<Square | null>(null)
   const bounds = useRef({ x: 0, y: 0, width: 0 })
   const drag = useRef<{ from: Square; piece: Piece } | null>(null)
   const start = useRef<{ x: number; y: number } | null>(null)
-  const motion = width > 0 && trainer.motion !== finishedMotion ? trainer.motion : null
+  const reducedMotion = useReducedMotion()
+  const motion = !reducedMotion && width > 0 && trainer.motion !== finishedMotion ? trainer.motion : null
   const finishMotion = useCallback(() => setFinishedMotion(trainer.motion), [trainer.motion])
   const ranks = trainer.side === 'w' ? [8, 7, 6, 5, 4, 3, 2, 1] : [1, 2, 3, 4, 5, 6, 7, 8]
   const columns = trainer.side === 'w' ? [...files] : [...files].reverse()
@@ -95,6 +104,21 @@ export function Board({ trainer, selected, setSelected, edgeToEdge = false }: {
   const pendingPromotion = promotion && trainer.enabled && selected === promotion.from && trainer.game.fen() === promotion.fen
     ? promotion
     : null
+  const canPlay = trainer.enabled && (trainer.status === 'playing' || trainer.status === 'wrong')
+  const promotionOpen = pendingPromotion !== null
+  function cancelPromotion() {
+    setPromotion(null)
+    setSelected(null)
+  }
+  useWebDialog(promotionOpen, 'promotion-dialog', 'promotion-queen', false, cancelPromotion)
+  useEffect(() => {
+    if (Platform.OS === 'web') return
+    if (pendingPromotion) promotionDestination.current = pendingPromotion.to
+    const target = promotionOpen ? promotionQueen.current : promotionDestination.current && squareRefs.current[promotionDestination.current]
+    if (!promotionOpen) promotionDestination.current = null
+    const handle = target ? findNodeHandle(target) : null
+    if (handle != null) AccessibilityInfo.setAccessibilityFocus(handle)
+  }, [promotionOpen, pendingPromotion])
   const requestMove = useCallback((from: Square, to: Square) => {
     if (trainer.game.moves({ square: from, verbose: true }).some((move) => move.to === to && move.promotion)) {
       setPromotion({ from, to, fen: trainer.game.fen() })
@@ -178,9 +202,9 @@ export function Board({ trainer, selected, setSelected, edgeToEdge = false }: {
   }
 
   return (
-    <View testID="chess-board" ref={board} onLayout={onLayout} onTouchStart={measure} style={[styles.board, edgeToEdge && styles.edgeToEdge]} {...pan.panHandlers}>
+    <View testID="chess-board" ref={board} role="group" accessibilityLabel={t('boardKeyboardHelp')} onLayout={onLayout} onTouchStart={measure} style={[styles.board, edgeToEdge && styles.edgeToEdge]} {...pan.panHandlers}>
       {ranks.map((rank, row) => (
-        <View key={rank} style={styles.row}>
+        <View key={rank} style={styles.row} aria-hidden={promotionOpen} accessibilityElementsHidden={promotionOpen} importantForAccessibility={promotionOpen ? 'no-hide-descendants' : 'auto'}>
           {columns.map((file, column) => {
             const square = `${file}${rank}` as Square
             const piece = trainer.game.get(square)
@@ -190,9 +214,27 @@ export function Board({ trainer, selected, setSelected, edgeToEdge = false }: {
             return (
               <Pressable
                 key={square}
+                ref={(element) => { if (element) squareRefs.current[square] = element; else delete squareRefs.current[square] }}
                 accessibilityRole="button"
-                accessibilityLabel={`${piece ? t(piece.color === 'w' ? 'whiteSquare' : 'blackSquare', { square, piece: t(pieceNames[piece.type]) }) : t('emptySquare', { square })}${isLegal ? t('legalMove') : ''}`}
-                accessibilityState={{ selected: selected === square, disabled: !trainer.enabled }}
+                accessibilityLabel={`${piece ? t(piece.color === 'w' ? 'whiteSquare' : 'blackSquare', { square, piece: t(pieceNames[piece.type]) }) : t('emptySquare', { square })}${isLegal ? t('legalMove') : ''}${selected === square ? t('selectedSquare') : ''}${isLast ? t('lastMoveSquare') : ''}`}
+                accessibilityState={{ selected: selected === square, disabled: !canPlay || promotionOpen }}
+                aria-disabled={!canPlay || promotionOpen}
+                tabIndex={Platform.OS === 'web' ? (!promotionOpen && focusedSquare === square ? 0 : -1) : undefined}
+                onFocus={() => { setFocusedSquare(square); setBoardHasFocus(true) }}
+                onBlur={() => setBoardHasFocus(false)}
+                onKeyDown={(event) => {
+                  if (Platform.OS !== 'web' || promotionOpen) return
+                  const key = event.nativeEvent.key
+                  const delta = key === 'ArrowLeft' ? [0, -1] : key === 'ArrowRight' ? [0, 1] : key === 'ArrowUp' ? [-1, 0] : key === 'ArrowDown' ? [1, 0] : null
+                  if (!delta) return
+                  event.preventDefault()
+                  const nextRank = ranks[row + delta[0]]
+                  const nextFile = columns[column + delta[1]]
+                  if (nextRank === undefined || nextFile === undefined) return
+                  const next = `${nextFile}${nextRank}` as Square
+                  setFocusedSquare(next)
+                  squareRefs.current[next]?.focus()
+                }}
                 onPress={() => chooseSquare(square)}
                 style={[
                   styles.square, { backgroundColor: dark ? palette.dark : palette.light },
@@ -200,10 +242,13 @@ export function Board({ trainer, selected, setSelected, edgeToEdge = false }: {
                   selected === square && styles.selected,
                 ]}
               >
-                {column === 0 && <Text style={[styles.coordinate, styles.rank, { color: palette.coordinate }]}>{rank}</Text>}
-                {row === 7 && <Text style={[styles.coordinate, styles.file, { color: palette.coordinate }]}>{file}</Text>}
-                {isLegal && <View pointerEvents="none" style={piece ? styles.captureHint : styles.moveHint} />}
-                {piece && !motion?.pieces.some(({ to }) => to === square) && <View pointerEvents="none" style={styles.piece}><SvgXml xml={pieceXml[piece.color][piece.type]} width="100%" height="100%" /></View>}
+                {column === 0 && <Text aria-hidden style={[styles.coordinate, styles.rank, { color: palette.coordinate }]}>{rank}</Text>}
+                {row === 7 && <Text aria-hidden style={[styles.coordinate, styles.file, { color: palette.coordinate }]}>{file}</Text>}
+                {isLegal && <View pointerEvents="none" aria-hidden style={piece ? styles.captureHint : styles.moveHint} />}
+                {isLast && <View pointerEvents="none" aria-hidden style={styles.lastMarker} />}
+                {selected === square && <View pointerEvents="none" aria-hidden style={styles.selectedMarker} />}
+                {boardHasFocus && focusedSquare === square && <View pointerEvents="none" aria-hidden style={styles.focusMarker}><View style={styles.focusMarkerInner} /></View>}
+                {piece && !motion?.pieces.some(({ to }) => to === square) && <View pointerEvents="none" aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.piece}><SvgXml xml={pieceXml[pieceSet][piece.color][piece.type]} width="100%" height="100%" /></View>}
               </Pressable>
             )
           })}
@@ -216,12 +261,14 @@ export function Board({ trainer, selected, setSelected, edgeToEdge = false }: {
         </View>
       )}
       {pendingPromotion && (
-        <View accessibilityViewIsModal style={overlayStyles.promotionOverlay}>
+        <View testID="promotion-dialog" role="dialog" accessibilityLabel={t('promoteTo')} accessibilityViewIsModal onAccessibilityEscape={cancelPromotion} style={overlayStyles.promotionOverlay}>
           <Text style={overlayStyles.promotionTitle}>{t('promoteTo')}</Text>
           <View style={styles.promotionChoices}>
             {(['q', 'r', 'b', 'n'] as const).map((piece) => (
               <Pressable
                 key={piece}
+                ref={piece === 'q' ? promotionQueen : undefined}
+                testID={piece === 'q' ? 'promotion-queen' : undefined}
                 accessibilityRole="button"
                 accessibilityLabel={t('promotePiece', { piece: t(pieceNames[piece]) })}
                 onPress={() => {
@@ -229,20 +276,20 @@ export function Board({ trainer, selected, setSelected, edgeToEdge = false }: {
                   setPromotion(null)
                   setSelected(null)
                 }}
-                style={[styles.promotionChoice, { backgroundColor: palette.light }]}
+                style={[styles.promotionChoice, { backgroundColor: palette.light, width: width ? Math.max(0, Math.min(48, (width - 24) / 4)) : 48, height: width ? Math.max(0, Math.min(48, (width - 24) / 4)) : 48 }]}
               >
-                <SvgXml xml={pieceXml[trainer.side][piece]} width="100%" height="100%" />
+                <SvgXml xml={pieceXml[pieceSet][trainer.side][piece]} width="100%" height="100%" />
               </Pressable>
             ))}
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel={t('cancelPromotion')} style={styles.cancelPromotion} onPress={() => { setPromotion(null); setSelected(null) }}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('cancelPromotion')} style={styles.cancelPromotion} onPress={cancelPromotion}>
             <Text style={overlayStyles.promotionTitle}>{t('cancel')}</Text>
           </Pressable>
         </View>
       )}
       {ghost && width > 0 && (
         <View pointerEvents="none" style={[styles.ghost, { width: width / 8, height: width / 8, left: ghost.x - width / 16, top: ghost.y - width / 16 }]}>
-          <SvgXml xml={pieceXml[ghost.piece.color][ghost.piece.type]} width="100%" height="100%" />
+          <SvgXml xml={pieceXml[pieceSet][ghost.piece.color][ghost.piece.type]} width="100%" height="100%" />
         </View>
       )}
     </View>
@@ -266,8 +313,12 @@ const styles = StyleSheet.create({
   coordinate: { position: 'absolute', fontSize: 10, fontWeight: '700', zIndex: 2 },
   rank: { top: 3, left: 3 },
   file: { right: 3, bottom: 2 },
-  moveHint: { position: 'absolute', width: '24%', height: '24%', borderRadius: 100, backgroundColor: '#203d3260' },
-  captureHint: { position: 'absolute', width: '90%', height: '90%', borderRadius: 100, borderWidth: 4, borderColor: '#203d3270', zIndex: 2 },
+  moveHint: { position: 'absolute', width: '24%', height: '24%', borderRadius: 100, backgroundColor: '#132d43' },
+  captureHint: { position: 'absolute', width: '90%', height: '90%', borderRadius: 100, borderWidth: 4, borderColor: '#132d43', zIndex: 2 },
+  selectedMarker: { position: 'absolute', top: 1, right: 1, bottom: 1, left: 1, borderWidth: 3, borderColor: '#132d43', zIndex: 4 },
+  lastMarker: { position: 'absolute', top: 3, right: 3, width: 7, height: 7, borderRadius: 1, backgroundColor: '#132d43', zIndex: 4 },
+  focusMarker: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderWidth: 2, borderColor: '#fff', zIndex: 5 },
+  focusMarkerInner: { flex: 1, borderWidth: 2, borderColor: '#132d43' },
   disabledOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#202a20a1', padding: 20 },
   disabledText: { color: '#fff', fontSize: 21, textAlign: 'center', fontFamily: 'DMSerif' },
   ghost: { position: 'absolute', zIndex: 5 },

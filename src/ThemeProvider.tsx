@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Alert } from 'react-native'
 import { useLocalization } from './i18n/LocalizationProvider'
 import { createPreferenceWriter, readPreference } from './preferences'
 import { isBoardPalette, type BoardPalette } from './boardPalettes'
+import { notify } from './notify'
+import { defaultPieceSet, isPieceSet, isSavedPieceSet, type PieceSet } from './pieceSets'
 
 export type Theme = 'light' | 'dark'
 export type BoardPosition = 'top' | 'center'
@@ -19,6 +20,8 @@ const Context = createContext<{
   allowSeen: boolean
   setAllowSeen: (allow: boolean) => void
   seenOptionReady: boolean
+  pieceSet: PieceSet
+  setPieceSet: (pieceSet: PieceSet) => void
 } | null>(null)
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -28,6 +31,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [boardPosition, updateBoardPosition] = useState<BoardPosition>('top')
   const [allowSeen, updateAllowSeen] = useState(false)
   const [seenOptionReady, setSeenOptionReady] = useState(false)
+  const [pieceSet, updatePieceSet] = useState<PieceSet>(defaultPieceSet)
+  const pieceChanges = useRef(0)
+  const writePiecePreference = useMemo(() => createPreferenceWriter(), [])
   const changes = useRef(0)
   const boardChanges = useRef(0)
   const positionChanges = useRef(0)
@@ -46,7 +52,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }).catch((error: unknown) => {
       if (!active) return
       console.error('Unable to read theme preference', error)
-      Alert.alert(reportReadError.current('themeLoadError'), reportReadError.current('tryAgain'))
+      notify(reportReadError.current('themeLoadError'), reportReadError.current('tryAgain'))
     })
     return () => { active = false }
   }, [])
@@ -58,7 +64,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }).catch((error: unknown) => {
       if (!active) return
       console.error('Unable to read board palette preference', error)
-      Alert.alert(reportReadError.current('boardPaletteLoadError'), reportReadError.current('tryAgain'))
+      notify(reportReadError.current('boardPaletteLoadError'), reportReadError.current('tryAgain'))
     })
     return () => { active = false }
   }, [])
@@ -70,7 +76,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }).catch((error: unknown) => {
       if (!active) return
       console.error('Unable to read board position preference', error)
-      Alert.alert(reportReadError.current('boardPositionLoadError'), reportReadError.current('tryAgain'))
+      notify(reportReadError.current('boardPositionLoadError'), reportReadError.current('tryAgain'))
     })
     return () => { active = false }
   }, [])
@@ -83,19 +89,41 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }).catch((error: unknown) => {
       if (!active) return
       console.error('Unable to read seen puzzle preference', error)
-      Alert.alert(reportReadError.current('seenOptionLoadError'), reportReadError.current('tryAgain'))
+      notify(reportReadError.current('seenOptionLoadError'), reportReadError.current('tryAgain'))
     }).finally(() => {
       if (active) setSeenOptionReady(true)
     })
     return () => { active = false }
   }, [])
 
+  useEffect(() => {
+    let active = true
+    readPreference('chesstrainer.pieceSet', isSavedPieceSet).then((value) => {
+      if (active && pieceChanges.current === 0 && value !== null) {
+        updatePieceSet(isPieceSet(value) ? value : defaultPieceSet)
+      }
+    }).catch((error: unknown) => {
+      if (!active) return
+      console.error('Unable to read piece set preference', error)
+      notify(reportReadError.current('pieceSetLoadError'), reportReadError.current('tryAgain'))
+    })
+    return () => { active = false }
+  }, [])
+
+  const setPieceSet = useCallback((next: PieceSet) => {
+    pieceChanges.current++
+    updatePieceSet(next)
+    void writePiecePreference('chesstrainer.pieceSet', next).catch((error: unknown) => {
+      console.error('Unable to save piece set preference', error)
+      notify(t('pieceSetSaveError'), t('tryAgain'))
+    })
+  }, [t, writePiecePreference])
   const setTheme = useCallback((next: Theme) => {
     changes.current++
     updateTheme(next)
     void writePreference(storageKey, next).catch((error: unknown) => {
       console.error('Unable to save theme preference', error)
-      Alert.alert(t('themeSaveError'), t('tryAgain'))
+      notify(t('themeSaveError'), t('tryAgain'))
     })
   }, [t, writePreference])
   const setBoardPalette = useCallback((next: BoardPalette) => {
@@ -103,7 +131,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     updateBoardPalette(next)
     void writeBoardPreference('chesstrainer.boardPalette', next).catch((error: unknown) => {
       console.error('Unable to save board palette preference', error)
-      Alert.alert(t('boardPaletteSaveError'), t('tryAgain'))
+      notify(t('boardPaletteSaveError'), t('tryAgain'))
     })
   }, [t, writeBoardPreference])
   const setBoardPosition = useCallback((next: BoardPosition) => {
@@ -111,7 +139,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     updateBoardPosition(next)
     void writePositionPreference('chesstrainer.boardPosition', next).catch((error: unknown) => {
       console.error('Unable to save board position preference', error)
-      Alert.alert(t('boardPositionSaveError'), t('tryAgain'))
+      notify(t('boardPositionSaveError'), t('tryAgain'))
     })
   }, [t, writePositionPreference])
   const setAllowSeen = useCallback((next: boolean) => {
@@ -119,10 +147,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     updateAllowSeen(next)
     void writeSeenPreference('chesstrainer.allowSeen', next ? 'allow' : 'avoid').catch((error: unknown) => {
       console.error('Unable to save seen puzzle preference', error)
-      Alert.alert(t('seenOptionSaveError'), t('tryAgain'))
+      notify(t('seenOptionSaveError'), t('tryAgain'))
     })
   }, [t, writeSeenPreference])
-  const value = useMemo(() => ({ theme, setTheme, boardPalette, setBoardPalette, boardPosition, setBoardPosition, allowSeen, setAllowSeen, seenOptionReady }), [theme, setTheme, boardPalette, setBoardPalette, boardPosition, setBoardPosition, allowSeen, setAllowSeen, seenOptionReady])
+  const value = useMemo(() => ({ theme, setTheme, boardPalette, setBoardPalette, boardPosition, setBoardPosition, allowSeen, setAllowSeen, seenOptionReady, pieceSet, setPieceSet }), [theme, setTheme, boardPalette, setBoardPalette, boardPosition, setBoardPosition, allowSeen, setAllowSeen, seenOptionReady, pieceSet, setPieceSet])
   return <Context.Provider value={value}>{children}</Context.Provider>
 }
 
