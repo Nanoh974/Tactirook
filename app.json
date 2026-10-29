@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "ChessTrainer",
+    "slug": "chess-trainer-expo",
+    "version": "1.0.0",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/icon.png"
+    },
+    "experiments": {
+      "baseUrl": "/ChessTrainer"
+    },
+    "plugins": [
+      "expo-font"
+    ]
+  }
+}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Chess, type Square } from 'chess.js'
-import { categories, puzzles, type Category, type Puzzle } from './puzzles'
+import { Chess, type PieceSymbol, type Square } from 'chess.js'
+import { categories, type Category, type Puzzle } from './puzzles'
+import { createPuzzlePicker, initialPuzzle } from './puzzleLibrary'
 
 type Status = 'playing' | 'replying' | 'wrong' | 'success'
 
@@ -12,20 +13,23 @@ function setup(puzzle: Puzzle) {
 
 export function useChessTrainer() {
   const [selectedCategories, setSelectedCategories] = useState<Category[]>(categories.map(({ id }) => id))
-  const [puzzleIndex, setPuzzleIndex] = useState(0)
-  const [fen, setFen] = useState(() => setup(puzzles[0]))
+  const [puzzle, setPuzzle] = useState(initialPuzzle)
+  const [fen, setFen] = useState(() => setup(initialPuzzle))
   const [step, setStep] = useState(1)
   const [status, setStatus] = useState<Status>('playing')
   const [lastMove, setLastMove] = useState<[Square, Square] | null>(null)
-  const [solved, setSolved] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const request = useRef(0)
+  const pickPuzzle = useMemo(() => createPuzzlePicker(), [])
 
-  const puzzle = puzzles[puzzleIndex]
   const game = useMemo(() => new Chess(fen), [fen])
-  const side = new Chess(setup(puzzle)).turn()
+  const side = useMemo(() => new Chess(setup(puzzle)).turn(), [puzzle])
   const playerMoves = Math.ceil((puzzle.moves.length - 1) / 2)
   const movesPlayed = Math.floor(step / 2)
-  const enabled = selectedCategories.length > 0
+  const hasFocus = selectedCategories.length > 0
+  const enabled = hasFocus && !loading && !error
 
   function clearReply() {
     if (timer.current !== null) {
@@ -35,54 +39,82 @@ export function useChessTrainer() {
   }
 
   useEffect(() => () => {
+    request.current++
     if (timer.current !== null) clearTimeout(timer.current)
   }, [])
 
-  function restart(nextIndex = puzzleIndex, nextStatus: Status = 'playing') {
+  function resetPosition(nextPuzzle = puzzle, nextStatus: Status = 'playing') {
+    const position = setup(nextPuzzle)
     clearReply()
-    setPuzzleIndex(nextIndex)
-    setFen(setup(puzzles[nextIndex]))
+    setPuzzle(nextPuzzle)
+    setFen(position)
     setStep(1)
     setStatus(nextStatus)
     setLastMove(null)
   }
 
-  function toggleCategory(category: Category) {
-    const next = selectedCategories.includes(category)
-      ? selectedCategories.filter((id) => id !== category)
-      : [...selectedCategories, category]
-    setSelectedCategories(next)
-    if (next.length && (!selectedCategories.length || !next.includes(puzzle.category))) {
-      restart(puzzles.findIndex((item) => next.includes(item.category)))
-    } else if (!next.length) {
-      clearReply()
-    } else if (status === 'replying') {
-      restart()
+  function restart() {
+    request.current++
+    setLoading(false)
+    setError(null)
+    resetPosition()
+  }
+
+  async function loadNext(selected = selectedCategories) {
+    if (!selected.length) return
+    const currentRequest = ++request.current
+    clearReply()
+    setLoading(true)
+    setError(null)
+    try {
+      const next = await pickPuzzle(selected, puzzle.id)
+      if (request.current !== currentRequest) return
+      resetPosition(next)
+    } catch (cause: unknown) {
+      if (request.current !== currentRequest) return
+      console.error('Unable to load puzzle', cause)
+      setError(cause instanceof Error ? cause.message : 'Unable to read the puzzle library')
+    } finally {
+      if (request.current === currentRequest) setLoading(false)
     }
   }
 
-  function nextPuzzle() {
-    const eligible = puzzles.map((item, index) => selectedCategories.includes(item.category) ? index : -1).filter((index) => index >= 0)
-    if (!eligible.length) return
-    restart(eligible.find((index) => index > puzzleIndex) ?? eligible[0])
+  function selectCategories(next: Category[]) {
+    request.current++
+    clearReply()
+    setSelectedCategories(next)
+    setLoading(false)
+    setError(null)
+    if (next.length && !puzzle.themes.some((theme) => next.includes(theme))) {
+      void loadNext(next)
+    } else if (status === 'replying') {
+      resetPosition()
+    }
   }
 
-  function attemptMove(from: Square, to: Square) {
+  function toggleCategory(category: Category) {
+    selectCategories(selectedCategories.includes(category)
+      ? selectedCategories.filter((id) => id !== category)
+      : [...selectedCategories, category])
+  }
+
+  function attemptMove(from: Square, to: Square, promotion: PieceSymbol = 'q') {
     if (!enabled || (status !== 'playing' && status !== 'wrong') || game.turn() !== side) return
 
-    const candidate = game.moves({ square: from, verbose: true }).find((move) => move.to === to && (!move.promotion || move.promotion === 'q'))
-    if (!candidate || `${from}${to}${candidate.promotion ?? ''}` !== puzzle.moves[step]) {
-      restart(puzzleIndex, 'wrong')
+    const candidate = game.moves({ square: from, verbose: true })
+      .find((move) => move.to === to && (!move.promotion || move.promotion === promotion))
+    const next = new Chess(fen)
+    if (candidate) next.move(candidate)
+    const alternativeMate = puzzle.themes.includes('mateIn1') && next.isCheckmate()
+    if (!candidate || (`${from}${to}${candidate.promotion ?? ''}` !== puzzle.moves[step] && !alternativeMate)) {
+      resetPosition(puzzle, 'wrong')
       return
     }
 
-    const next = new Chess(fen)
-    next.move(candidate)
     setFen(next.fen())
     setLastMove([from, to])
-    if (step === puzzle.moves.length - 1) {
+    if (alternativeMate || step === puzzle.moves.length - 1) {
       setStatus('success')
-      setSolved((count) => count + 1)
       return
     }
 
@@ -101,8 +133,10 @@ export function useChessTrainer() {
   }
 
   return {
-    puzzle, game, side, status, lastMove, selectedCategories, enabled,
-    solved, playerMoves, movesPlayed, attemptMove, toggleCategory, nextPuzzle,
-    restart: () => restart(),
+    puzzle, game, side, status, lastMove, selectedCategories, enabled, hasFocus, loading, error,
+    playerMoves, movesPlayed, attemptMove, toggleCategory, selectCategories,
+    nextPuzzle: () => { void loadNext() },
+    retry: () => { void loadNext() },
+    restart,
   }
 }
