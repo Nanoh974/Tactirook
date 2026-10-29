@@ -78,10 +78,10 @@ export function createPuzzlePicker() {
   let pool: number[] = []
   let cursor = 0
 
-  return async function pickPuzzle(selected: Category[], avoidId: string): Promise<Puzzle> {
+  return async function pickPuzzle(selected: Category[], avoidId: string, seen: ReadonlySet<number> = new Set(), onSelected?: (index: number) => void): Promise<Puzzle> {
     if (!selected.length) throw new Error('Select at least one puzzle theme')
     const key = [...selected].sort().join(',')
-    if (key !== selectionKey || cursor >= pool.length) {
+    async function refill() {
       let eligible: number[]
       if (selected.length === categories.length) {
         eligible = Array.from({ length: libraryTotal }, (_, index) => index)
@@ -98,12 +98,40 @@ export function createPuzzlePicker() {
       cursor = 0
       selectionKey = key
     }
-    let puzzle = await loadPuzzle(pool[cursor++])
-    // At a cycle/selection boundary, avoid immediately repeating the current puzzle.
-    if (puzzle.id === avoidId && pool.length > 1) {
-      if (cursor >= pool.length) cursor = 0
-      puzzle = await loadPuzzle(pool[cursor++])
+    if (key !== selectionKey || cursor >= pool.length) await refill()
+    let index: number | undefined
+    while (cursor < pool.length) {
+      const candidate = pool[cursor++]
+      if (!seen.has(candidate)) { index = candidate; break }
     }
+    if (index === undefined) {
+      await refill()
+      index = pool.find((candidate) => !seen.has(candidate))
+      if (index === undefined) {
+        index = pool[cursor++]
+        const alternateIndex = pool.length > 1 ? pool[cursor++] : undefined
+        let puzzle = await loadPuzzle(index)
+        if (puzzle.id === avoidId && alternateIndex !== undefined) {
+          index = alternateIndex
+          puzzle = await loadPuzzle(index)
+        }
+        onSelected?.(index)
+        return puzzle
+      }
+      cursor = pool.indexOf(index) + 1
+    }
+    const currentPool = pool
+    let puzzle = await loadPuzzle(index)
+    if (puzzle.id === avoidId) {
+      const alternative = currentPool.findIndex((candidate) => candidate !== index && !seen.has(candidate))
+      if (alternative !== -1) {
+        const current = currentPool.indexOf(index)
+        ;[currentPool[current], currentPool[alternative]] = [currentPool[alternative], currentPool[current]]
+        index = currentPool[current]
+        puzzle = await loadPuzzle(index)
+      }
+    }
+    onSelected?.(index)
     return puzzle
   }
 }

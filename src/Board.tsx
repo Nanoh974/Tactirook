@@ -1,16 +1,70 @@
-import { useCallback, useMemo, useRef, useState, type ComponentRef } from 'react'
-import { PanResponder, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react'
+import { Animated, Easing, PanResponder, Platform, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
 import type { Color, PieceSymbol, Square } from 'chess.js'
 import { SvgXml } from 'react-native-svg'
-import type { useChessTrainer } from './useChessTrainer'
+import type { MoveMotion, PieceMotion, useChessTrainer } from './useChessTrainer'
 import { pieceXml } from './pieceXml'
+import { useLocalization } from './i18n/LocalizationProvider'
+import type { MessageKey } from './i18n/messages'
+import { useTheme } from './ThemeProvider'
+import { boardPalettes } from './boardPalettes'
 
 const files = 'abcdefgh'
 type Trainer = ReturnType<typeof useChessTrainer>
 type Piece = { color: Color; type: PieceSymbol }
 type Ghost = { piece: Piece; x: number; y: number }
-const pieceNames: Record<PieceSymbol, string> = {
+const pieceNames: Record<PieceSymbol, MessageKey> = {
   k: 'king', q: 'queen', r: 'rook', b: 'bishop', n: 'knight', p: 'pawn',
+}
+
+function SlidingPieces({ motions, width, side, onComplete }: {
+  motions: PieceMotion[]
+  width: number
+  side: Color
+  onComplete: () => void
+}) {
+  const [progress] = useState(() => new Animated.Value(0))
+  useEffect(() => {
+    const animation = Animated.timing(progress, {
+      toValue: 1,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: Platform.OS !== 'web',
+    })
+    animation.start(({ finished }) => { if (finished) onComplete() })
+    return () => animation.stop()
+  }, [progress, onComplete])
+
+  function position(square: Square) {
+    const file = files.indexOf(square[0])
+    const rank = Number(square[1]) - 1
+    return { x: side === 'w' ? file : 7 - file, y: side === 'w' ? 7 - rank : rank }
+  }
+
+  const size = width / 8
+  return motions.map(({ from, to, piece }) => {
+    const start = position(from)
+    const end = position(to)
+    return (
+      <Animated.View
+        key={`${from}-${to}`}
+        testID={`sliding-piece-${from}-${to}`}
+        pointerEvents="none"
+        style={[styles.slidingPiece, {
+          left: (end.x + 0.04) * size,
+          top: (end.y + 0.04) * size,
+          width: size * 0.92,
+          height: size * 0.92,
+          transform: [
+            { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [(start.x - end.x) * size, 0] }) },
+            { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [(start.y - end.y) * size, 0] }) },
+          ],
+        }]}
+      >
+        <SvgXml xml={pieceXml[piece.color][piece.type]} width="100%" height="100%" />
+      </Animated.View>
+    )
+  })
 }
 
 export function Board({ trainer, selected, setSelected, edgeToEdge = false }: {
@@ -19,13 +73,20 @@ export function Board({ trainer, selected, setSelected, edgeToEdge = false }: {
   setSelected: (square: Square | null) => void
   edgeToEdge?: boolean
 }) {
+  const { t } = useLocalization()
+  const { theme, boardPalette } = useTheme()
+  const palette = boardPalettes[boardPalette]
+  const overlayStyles = theme === 'dark' ? darkOverlayStyles : styles
   const [width, setWidth] = useState(0)
   const [ghost, setGhost] = useState<Ghost | null>(null)
+  const [finishedMotion, setFinishedMotion] = useState<MoveMotion | null>(null)
   const [promotion, setPromotion] = useState<{ from: Square; to: Square; fen: string } | null>(null)
   const board = useRef<ComponentRef<typeof View>>(null)
   const bounds = useRef({ x: 0, y: 0, width: 0 })
   const drag = useRef<{ from: Square; piece: Piece } | null>(null)
   const start = useRef<{ x: number; y: number } | null>(null)
+  const motion = width > 0 && trainer.motion !== finishedMotion ? trainer.motion : null
+  const finishMotion = useCallback(() => setFinishedMotion(trainer.motion), [trainer.motion])
   const ranks = trainer.side === 'w' ? [8, 7, 6, 5, 4, 3, 2, 1] : [1, 2, 3, 4, 5, 6, 7, 8]
   const columns = trainer.side === 'w' ? [...files] : [...files].reverse()
   const legalSquares = selected && trainer.enabled && (trainer.status === 'playing' || trainer.status === 'wrong')
@@ -117,7 +178,7 @@ export function Board({ trainer, selected, setSelected, edgeToEdge = false }: {
   }
 
   return (
-    <View ref={board} onLayout={onLayout} onTouchStart={measure} style={[styles.board, edgeToEdge && styles.edgeToEdge]} {...pan.panHandlers}>
+    <View testID="chess-board" ref={board} onLayout={onLayout} onTouchStart={measure} style={[styles.board, edgeToEdge && styles.edgeToEdge]} {...pan.panHandlers}>
       {ranks.map((rank, row) => (
         <View key={rank} style={styles.row}>
           {columns.map((file, column) => {
@@ -130,51 +191,52 @@ export function Board({ trainer, selected, setSelected, edgeToEdge = false }: {
               <Pressable
                 key={square}
                 accessibilityRole="button"
-                accessibilityLabel={`${square}, ${piece ? `${piece.color === 'w' ? 'white' : 'black'} ${pieceNames[piece.type]}` : 'empty'}${isLegal ? ', legal move' : ''}`}
+                accessibilityLabel={`${piece ? t(piece.color === 'w' ? 'whiteSquare' : 'blackSquare', { square, piece: t(pieceNames[piece.type]) }) : t('emptySquare', { square })}${isLegal ? t('legalMove') : ''}`}
                 accessibilityState={{ selected: selected === square, disabled: !trainer.enabled }}
                 onPress={() => chooseSquare(square)}
                 style={[
-                  styles.square, dark ? styles.dark : styles.light,
+                  styles.square, { backgroundColor: dark ? palette.dark : palette.light },
                   isLast && (dark ? styles.lastDark : styles.lastLight),
                   selected === square && styles.selected,
                 ]}
               >
-                {column === 0 && <Text style={[styles.coordinate, styles.rank, { color: dark ? '#f6e4c4' : '#a1714e' }]}>{rank}</Text>}
-                {row === 7 && <Text style={[styles.coordinate, styles.file, { color: dark ? '#f6e4c4' : '#a1714e' }]}>{file}</Text>}
+                {column === 0 && <Text style={[styles.coordinate, styles.rank, { color: palette.coordinate }]}>{rank}</Text>}
+                {row === 7 && <Text style={[styles.coordinate, styles.file, { color: palette.coordinate }]}>{file}</Text>}
                 {isLegal && <View pointerEvents="none" style={piece ? styles.captureHint : styles.moveHint} />}
-                {piece && <View pointerEvents="none" style={styles.piece}><SvgXml xml={pieceXml[piece.color][piece.type]} width="100%" height="100%" /></View>}
+                {piece && !motion?.pieces.some(({ to }) => to === square) && <View pointerEvents="none" style={styles.piece}><SvgXml xml={pieceXml[piece.color][piece.type]} width="100%" height="100%" /></View>}
               </Pressable>
             )
           })}
         </View>
       ))}
+      {motion && <SlidingPieces key={motion.id} motions={motion.pieces} width={width} side={trainer.side} onComplete={finishMotion} />}
       {!trainer.enabled && (
         <View style={styles.disabledOverlay} pointerEvents="none">
-          <Text style={styles.disabledText}>{trainer.loading ? 'Loading puzzle...' : trainer.error ? 'Puzzle unavailable' : 'Select a focus area to begin'}</Text>
+          <Text style={styles.disabledText}>{t(trainer.loading ? 'loadingPuzzle' : trainer.error ? 'puzzleUnavailable' : 'selectFocus')}</Text>
         </View>
       )}
       {pendingPromotion && (
-        <View accessibilityViewIsModal style={styles.promotionOverlay}>
-          <Text style={styles.promotionTitle}>Promote to</Text>
+        <View accessibilityViewIsModal style={overlayStyles.promotionOverlay}>
+          <Text style={overlayStyles.promotionTitle}>{t('promoteTo')}</Text>
           <View style={styles.promotionChoices}>
             {(['q', 'r', 'b', 'n'] as const).map((piece) => (
               <Pressable
                 key={piece}
                 accessibilityRole="button"
-                accessibilityLabel={`Promote to ${pieceNames[piece]}`}
+                accessibilityLabel={t('promotePiece', { piece: t(pieceNames[piece]) })}
                 onPress={() => {
                   trainer.attemptMove(pendingPromotion.from, pendingPromotion.to, piece)
                   setPromotion(null)
                   setSelected(null)
                 }}
-                style={styles.promotionChoice}
+                style={[styles.promotionChoice, { backgroundColor: palette.light }]}
               >
                 <SvgXml xml={pieceXml[trainer.side][piece]} width="100%" height="100%" />
               </Pressable>
             ))}
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="Cancel promotion" style={styles.cancelPromotion} onPress={() => { setPromotion(null); setSelected(null) }}>
-            <Text style={styles.promotionTitle}>Cancel</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('cancelPromotion')} style={styles.cancelPromotion} onPress={() => { setPromotion(null); setSelected(null) }}>
+            <Text style={overlayStyles.promotionTitle}>{t('cancel')}</Text>
           </Pressable>
         </View>
       )}
@@ -197,8 +259,6 @@ const styles = StyleSheet.create({
   cancelPromotion: { minHeight: 44, padding: 10, justifyContent: 'center' },
   row: { flexDirection: 'row', flex: 1 },
   square: { width: '12.5%', alignItems: 'center', justifyContent: 'center' },
-  light: { backgroundColor: '#f2dfbd' },
-  dark: { backgroundColor: '#ae7957' },
   lastLight: { backgroundColor: '#e8d79b' },
   lastDark: { backgroundColor: '#bca568' },
   selected: { backgroundColor: '#e3c56d' },
@@ -211,4 +271,11 @@ const styles = StyleSheet.create({
   disabledOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#202a20a1', padding: 20 },
   disabledText: { color: '#fff', fontSize: 21, textAlign: 'center', fontFamily: 'DMSerif' },
   ghost: { position: 'absolute', zIndex: 5 },
+  slidingPiece: { position: 'absolute', zIndex: 3 },
+})
+
+const darkOverlayStyles = StyleSheet.create({
+  ...styles,
+  promotionOverlay: { ...styles.promotionOverlay, backgroundColor: '#182331f2' },
+  promotionTitle: { ...styles.promotionTitle, color: '#edf3fa' },
 })

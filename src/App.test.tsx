@@ -1,15 +1,40 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react-native'
-import { Dimensions, StyleSheet } from 'react-native'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native'
+import { Alert, Animated, Dimensions, StyleSheet } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { getLocales } from 'expo-localization'
 import App from '../App'
 import { createPuzzlePicker } from './puzzleLibrary'
 import { categoryGroups } from './puzzles'
-import { underpromotionPuzzle } from './testPuzzleFixtures'
+import { createFixturePicker, underpromotionPuzzle } from './testPuzzleFixtures'
+import type { Puzzle } from './puzzles'
 
 jest.mock('expo-font', () => ({ useFonts: () => [true, null] }))
 jest.mock('react-native-safe-area-context', () => jest.requireActual('react-native-safe-area-context/jest/mock').default)
 jest.mock('./puzzleLibrary')
+jest.mock('expo-localization', () => ({ getLocales: jest.fn(() => [{ languageCode: 'en' }]) }))
+jest.mock('@react-native-async-storage/async-storage', () => jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'))
 
-afterEach(() => jest.useRealTimers())
+afterEach(async () => {
+  jest.useRealTimers()
+  await AsyncStorage.clear()
+})
+
+function controlAnimations() {
+  return jest.spyOn(Animated, 'timing').mockImplementation((_value, config) => {
+    let timer: ReturnType<typeof setTimeout>
+    return {
+      start: (callback) => { timer = setTimeout(() => callback?.({ finished: true }), config.duration) },
+      stop: () => clearTimeout(timer),
+      reset: () => clearTimeout(timer),
+    }
+  })
+}
+
+function mockNextPuzzle(puzzle: Puzzle) {
+  const initial = createFixturePicker()
+  jest.mocked(createPuzzlePicker).mockReturnValueOnce((selected, avoidId, seen, onSelected) =>
+    avoidId ? Promise.resolve(puzzle) : initial(selected, avoidId, seen, onSelected))
+}
 
 test('opens the mobile menu and solves a puzzle by tapping', async () => {
   const size = { width: 375, height: 812, scale: 1, fontScale: 1 }
@@ -38,6 +63,345 @@ test('opens the mobile menu and solves a puzzle by tapping', async () => {
   expect(screen.getByText('Puzzle #00465')).toBeTruthy()
 })
 
+test('counts distinct seen puzzles, resets them, and persists the repeat option', async () => {
+  const { unmount } = await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  expect(screen.getByText('Puzzles seen: 1')).toBeTruthy()
+  await fireEvent.press(screen.getByRole('checkbox', { name: 'Allow seen puzzles' }))
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith('chesstrainer.allowSeen', 'allow'))
+  await fireEvent.press(screen.getByRole('button', { name: 'Close training settings' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Next puzzle' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  expect(screen.getByText('Puzzles seen: 2')).toBeTruthy()
+  await fireEvent.press(screen.getByRole('button', { name: 'Reset seen puzzles' }))
+  expect(screen.getByText('Puzzles seen: 0')).toBeTruthy()
+  await fireEvent.press(screen.getByRole('button', { name: 'Close training settings' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Next puzzle' }))
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith('chesstrainer.seenPuzzles', expect.any(String)))
+  await unmount()
+
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  expect(screen.getByRole('checkbox', { name: 'Allow seen puzzles', checked: true })).toBeTruthy()
+  expect(screen.getByText('Puzzles seen: 2')).toBeTruthy()
+})
+
+test('reports seen memory failures and retries a failed initial read', async () => {
+  jest.mocked(AsyncStorage.getItem).mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+    .mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+    .mockRejectedValueOnce(new Error('Read failed'))
+  const log = jest.spyOn(console, 'error').mockImplementation(() => {})
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {})
+  await render(<App />)
+  await waitFor(() => expect(alert).toHaveBeenCalledWith('Unable to read seen puzzles', 'Please try again.'))
+  expect(screen.queryByTestId('chess-board')).toBeNull()
+  await fireEvent.press(screen.getByRole('button', { name: 'Retry loading puzzle' }))
+  expect(screen.getByTestId('chess-board')).toBeTruthy()
+  jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error('Write failed'))
+  await fireEvent.press(screen.getByRole('button', { name: 'Next puzzle' }))
+  await waitFor(() => expect(alert).toHaveBeenCalledWith('Unable to save seen puzzles', 'Please try again.'))
+  alert.mockRestore()
+  log.mockRestore()
+})
+
+test.each([375, 1280])('shows the player king and updates it with the puzzle at width %i', async (width) => {
+  const size = { width, height: 812, scale: 1, fontScale: 1 }
+  Dimensions.set({ window: size, screen: size })
+  mockNextPuzzle(underpromotionPuzzle)
+  await render(<App />)
+  expect(screen.getByTestId('feedback-king', { includeHiddenElements: true }).props.children.props.children[0].props)
+    .toMatchObject({ fill: '#f0f0f0', d: 'M27.67 15.22v-3.54h4.44V7.25h-4.93V3.36H22.8v3.9h-4.93v4.42h4.44v3.55' })
+  await fireEvent.press(screen.getByRole('button', { name: 'Next puzzle' }))
+  expect(screen.getByTestId('feedback-king', { includeHiddenElements: true }).props.children.props.children[0].props)
+    .toMatchObject({ fill: '#5f5955', d: 'M27.67 15.22v-3.54h4.44V7.25h-4.93V3.36H22.8v3.9h-4.93v4.42h4.44v3.55' })
+})
+
+test('preserves the solved and incorrect move feedback icons', async () => {
+  const size = { width: 375, height: 812, scale: 1, fontScale: 1 }
+  Dimensions.set({ window: size, screen: size })
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'f1, white rook' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'f2, empty, legal move' }))
+  expect(within(screen.getByTestId('feedback-icon', { includeHiddenElements: true })).getByText('↻', { includeHiddenElements: true })).toBeTruthy()
+  await fireEvent.press(screen.getByRole('button', { name: 'f1, white rook' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'f8, empty, legal move' }))
+  expect(within(screen.getByTestId('feedback-icon', { includeHiddenElements: true })).getByText('✓', { includeHiddenElements: true })).toBeTruthy()
+})
+
+test.each([375, 1280])('changes and restores the appearance without changing the puzzle at width %i', async (width) => {
+  const size = { width, height: 812, scale: 1, fontScale: 1 }
+  Dimensions.set({ window: size, screen: size })
+  const { unmount } = await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  expect(screen.getByRole('radio', { name: 'Light', checked: true })).toBeTruthy()
+  await fireEvent.press(screen.getByRole('radio', { name: 'Dark' }))
+  expect(screen.getByRole('radio', { name: 'Dark', checked: true })).toBeTruthy()
+  expect(StyleSheet.flatten(screen.getByTestId('training-menu').props.style).backgroundColor).toBe('#192637')
+  await fireEvent.press(screen.getByRole('button', { name: 'Close training settings' }))
+  expect(screen.getByRole('button', { name: 'f1, white rook' })).toBeTruthy()
+  expect(StyleSheet.flatten(screen.getByRole('button', { name: 'f1, white rook' }).props.style).backgroundColor).toBe('#ae7957')
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith('chesstrainer.theme', 'dark'))
+  await unmount()
+
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  await waitFor(() => expect(screen.getByRole('radio', { name: 'Dark', checked: true })).toBeTruthy())
+  await fireEvent.press(screen.getByRole('radio', { name: 'Light' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Close training settings' }))
+  expect(StyleSheet.flatten(screen.getByRole('button', { name: 'f1, white rook' }).props.style).backgroundColor).toBe('#ae7957')
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenLastCalledWith('chesstrainer.theme', 'light'))
+})
+
+test.each([
+  ['Brown / cream', 'brown', '#ae7957', '#f2dfbd'],
+  ['Blue', 'blue', '#7999b3', '#dbe8f3'],
+  ['Green', 'green', '#778d76', '#c4cdb5'],
+])('persists the %s board independently of the appearance', async (label, key, dark, light) => {
+  const { unmount } = await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  expect(screen.getByRole('radio', { name: 'Brown / cream', checked: true })).toBeTruthy()
+  await fireEvent.press(screen.getByRole('radio', { name: label }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Dark' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Close training settings' }))
+  expect(StyleSheet.flatten(screen.getByRole('button', { name: /^f1, white rook/ }).props.style).backgroundColor).toBe(dark)
+  expect(StyleSheet.flatten(screen.getByRole('button', { name: /^b8,/ }).props.style).backgroundColor).toBe(light)
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith('chesstrainer.boardPalette', key))
+  await unmount()
+
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  await waitFor(() => expect(screen.getByRole('radio', { name: label, checked: true })).toBeTruthy())
+  await fireEvent.press(screen.getByRole('radio', { name: 'Light' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Close training settings' }))
+  expect(StyleSheet.flatten(screen.getByRole('button', { name: /^f1, white rook/ }).props.style).backgroundColor).toBe(dark)
+  expect(StyleSheet.flatten(screen.getByRole('button', { name: /^b8,/ }).props.style).backgroundColor).toBe(light)
+})
+
+test('a late saved board palette cannot override a new choice', async () => {
+  let resolve: (value: string | null) => void = () => { throw new Error('Storage read not started') }
+  jest.mocked(AsyncStorage.getItem).mockResolvedValueOnce(null).mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Blue' }))
+  await act(() => resolve('green'))
+  expect(screen.getByRole('radio', { name: 'Blue', checked: true })).toBeTruthy()
+})
+
+test('saves rapid board palette changes in order', async () => {
+  let finishWrite: () => void = () => { throw new Error('Storage write not started') }
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  jest.mocked(AsyncStorage.setItem).mockClear()
+  jest.mocked(AsyncStorage.setItem).mockImplementationOnce(() => new Promise((resolve) => { finishWrite = resolve }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Blue' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Green' }))
+  expect(AsyncStorage.setItem).toHaveBeenCalledTimes(1)
+  await act(() => finishWrite())
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenLastCalledWith('chesstrainer.boardPalette', 'green'))
+  expect(await AsyncStorage.getItem('chesstrainer.boardPalette')).toBe('green')
+})
+
+test('reports board palette read and write failures', async () => {
+  jest.mocked(AsyncStorage.getItem).mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('Read failed'))
+  const log = jest.spyOn(console, 'error').mockImplementation(() => {})
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {})
+  await render(<App />)
+  await waitFor(() => expect(alert).toHaveBeenCalledWith('Unable to read the saved board color', 'Please try again.'))
+  jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error('Write failed'))
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Blue' }))
+  await waitFor(() => expect(alert).toHaveBeenCalledWith('Unable to save the board color', 'Please try again.'))
+  expect(screen.getByRole('radio', { name: 'Blue', checked: true })).toBeTruthy()
+  alert.mockRestore()
+  log.mockRestore()
+})
+
+test('theme choice is translated and survives language changes', async () => {
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Dark' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Blue' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Français' }))
+  expect(screen.getByRole('radio', { name: 'Sombre', checked: true })).toBeTruthy()
+  expect(screen.getByRole('radio', { name: 'Bleu', checked: true })).toBeTruthy()
+  await fireEvent.press(screen.getByRole('radio', { name: 'Clair' }))
+  expect(screen.getByRole('radio', { name: 'Clair', checked: true })).toBeTruthy()
+})
+
+test('a late saved theme cannot override a new choice', async () => {
+  let resolve: (value: string | null) => void = () => { throw new Error('Storage read not started') }
+  jest.mocked(AsyncStorage.getItem).mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Dark' }))
+  await act(() => resolve('light'))
+  expect(screen.getByRole('radio', { name: 'Dark', checked: true })).toBeTruthy()
+})
+
+test('saves rapid appearance changes in order', async () => {
+  let finishWrite: () => void = () => { throw new Error('Storage write not started') }
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  jest.mocked(AsyncStorage.setItem).mockClear()
+  jest.mocked(AsyncStorage.setItem).mockImplementationOnce(() => new Promise((resolve) => { finishWrite = resolve }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Dark' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Light' }))
+  expect(AsyncStorage.setItem).toHaveBeenCalledTimes(1)
+  await act(() => finishWrite())
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenLastCalledWith('chesstrainer.theme', 'light'))
+  expect(await AsyncStorage.getItem('chesstrainer.theme')).toBe('light')
+})
+
+test('changing appearance and board color preserves a solved position', async () => {
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'f1, white rook' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'f8, empty, legal move' }))
+  expect(screen.getByText('Puzzle solved!')).toBeTruthy()
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Dark' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Blue' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Close training settings' }))
+  expect(screen.getByText('Puzzle solved!')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'f8, white rook' })).toBeTruthy()
+})
+
+test('reports theme preference read and write failures', async () => {
+  jest.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error('Read failed'))
+  const log = jest.spyOn(console, 'error').mockImplementation(() => {})
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {})
+  await render(<App />)
+  await waitFor(() => expect(alert).toHaveBeenCalledWith('Unable to read the saved theme preference', 'Please try again.'))
+  jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error('Write failed'))
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Dark' }))
+  await waitFor(() => expect(alert).toHaveBeenCalledWith('Unable to save the theme preference', 'Please try again.'))
+  expect(screen.getByRole('radio', { name: 'Dark', checked: true })).toBeTruthy()
+  alert.mockRestore()
+  log.mockRestore()
+})
+
+test('changes language, searches translated themes, and restores the preference on restart', async () => {
+  const size = { width: 375, height: 812, scale: 1, fontScale: 1 }
+  Dimensions.set({ window: size, screen: size })
+  const { unmount } = await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Français' }))
+  expect(screen.getByRole('radio', { name: 'Français', checked: true })).toBeTruthy()
+  await fireEvent.changeText(screen.getByLabelText('Rechercher des thèmes'), 'fourchette')
+  expect(screen.getByRole('checkbox', { name: 'Fourchettes', checked: true })).toBeTruthy()
+  await fireEvent.press(screen.getByRole('checkbox', { name: 'Fourchettes' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Fermer les paramètres' }))
+  expect(screen.getByRole('button', { name: 'f1, pièce blanche : tour' })).toBeTruthy()
+  expect(screen.getByText('À vous de jouer')).toBeTruthy()
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith('chesstrainer.language', 'fr'))
+  await unmount()
+
+  await render(<App />)
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Votre entraînement' })).toBeTruthy())
+  await fireEvent.press(screen.getByRole('button', { name: 'Votre entraînement' }))
+  expect(screen.getByRole('radio', { name: 'Français', checked: true })).toBeTruthy()
+})
+
+test('switches among all supported languages without losing puzzle settings', async () => {
+  const size = { width: 1280, height: 812, scale: 1, fontScale: 1 }
+  Dimensions.set({ window: size, screen: size })
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  await fireEvent.press(screen.getByRole('checkbox', { name: 'Hide puzzle rating' }))
+  for (const [label, heading] of [
+    ['Español', 'Ajustes'], ['日本語', '設定'], ['简体中文', '训练设置'],
+    ['हिन्दी', 'अभ्यास सेटिंग'], ['Italiano', 'Impostazioni'], ['English', 'Training settings'],
+  ]) {
+    await fireEvent.press(screen.getByRole('radio', { name: label }))
+    expect(screen.getByRole('radio', { name: label, checked: true })).toBeTruthy()
+    expect(screen.getByText(new RegExp(`^${heading}`))).toBeTruthy()
+  }
+  expect(screen.getByRole('checkbox', { name: 'Hide puzzle rating', checked: true })).toBeTruthy()
+})
+
+test('a late saved preference cannot overwrite a language chosen in the menu', async () => {
+  let resolve: (value: string | null) => void = () => { throw new Error('Storage read not started') }
+  jest.mocked(AsyncStorage.getItem).mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+  const size = { width: 375, height: 812, scale: 1, fontScale: 1 }
+  Dimensions.set({ window: size, screen: size })
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  await fireEvent.press(screen.getByRole('radio', { name: '日本語' }))
+  await act(() => resolve('fr'))
+  expect(screen.getByRole('radio', { name: '日本語', checked: true })).toBeTruthy()
+  expect(screen.getByRole('button', { name: '設定を閉じる' })).toBeTruthy()
+})
+
+test('saves rapid language changes in order', async () => {
+  let finishWrite: () => void = () => { throw new Error('Storage write not started') }
+  const size = { width: 375, height: 812, scale: 1, fontScale: 1 }
+  Dimensions.set({ window: size, screen: size })
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  jest.mocked(AsyncStorage.setItem).mockClear()
+  jest.mocked(AsyncStorage.setItem).mockImplementationOnce(() => new Promise((resolve) => { finishWrite = resolve }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Français' }))
+  await fireEvent.press(screen.getByRole('radio', { name: '日本語' }))
+  expect(AsyncStorage.setItem).toHaveBeenCalledTimes(1)
+  await act(() => finishWrite())
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenLastCalledWith('chesstrainer.language', 'ja'))
+  expect(await AsyncStorage.getItem('chesstrainer.language')).toBe('ja')
+})
+
+test('uses the device language when no preference has been saved', async () => {
+  const locale = getLocales()[0]
+  jest.mocked(getLocales).mockReturnValue([{ ...locale, languageCode: 'fr' }])
+  await render(<App />)
+  expect(screen.getByRole('button', { name: 'Votre entraînement' })).toBeTruthy()
+  jest.mocked(getLocales).mockReturnValue([locale])
+})
+
+test('reports preference read and write failures', async () => {
+  jest.mocked(AsyncStorage.getItem).mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('Read failed'))
+  const log = jest.spyOn(console, 'error').mockImplementation(() => {})
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {})
+  await render(<App />)
+  await waitFor(() => expect(alert).toHaveBeenCalledWith('Unable to read the saved language preference', 'Please try again.'))
+  jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error('Write failed'))
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Français' }))
+  await waitFor(() => expect(alert).toHaveBeenCalledWith('Impossible d’enregistrer la langue', 'Veuillez réessayer.'))
+  expect(screen.getByRole('radio', { name: 'Français', checked: true })).toBeTruthy()
+  expect(log).toHaveBeenCalledTimes(2)
+  alert.mockRestore()
+  log.mockRestore()
+})
+
+test.each([
+  ['mobile', 375],
+  ['desktop', 1280],
+])('keeps the settings header outside the scrollable content on %s', async (_label, width) => {
+  const size = { width, height: 812, scale: 1, fontScale: 1 }
+  Dimensions.set({ window: size, screen: size })
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+
+  const menu = screen.getByTestId('training-menu')
+  const header = within(menu).getByTestId('training-menu-header')
+  const scroll = within(menu).getByTestId('training-menu-scroll')
+  expect(within(header).getByRole('button', { name: 'Close training settings' })).toBeTruthy()
+  expect(within(scroll).queryByRole('button', { name: 'Close training settings' })).toBeNull()
+  const menuStyle = StyleSheet.flatten(menu.props.style)
+  if (width <= 740) {
+    expect(menuStyle).toMatchObject({ top: 0, bottom: 0, left: 0, right: 0, width: '100%', maxWidth: '100%' })
+    expect(screen.queryByRole('button', { name: 'Your training' })).toBeNull()
+  } else {
+    expect(menuStyle).toMatchObject({ top: 75, maxWidth: 360 })
+    expect(screen.getByRole('button', { name: 'Close training menu', includeHiddenElements: true })).toBeTruthy()
+  }
+  await fireEvent.press(within(scroll).getByRole('checkbox', { name: 'Hide puzzle rating' }))
+  await fireEvent.scroll(scroll, { nativeEvent: { contentOffset: { x: 0, y: 800 } } })
+  await fireEvent.press(within(header).getByRole('button', { name: 'Close training settings' }))
+  expect(screen.queryByTestId('training-menu')).toBeNull()
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  expect(screen.getByRole('checkbox', { name: 'Hide puzzle rating', checked: true })).toBeTruthy()
+})
+
 test('mobile settings independently hide puzzle details across puzzles', async () => {
   const size = { width: 320, height: 568, scale: 1, fontScale: 1 }
   Dimensions.set({ window: size, screen: size })
@@ -63,10 +427,165 @@ test('mobile board uses the available width and fits short screens', async () =>
   Dimensions.set({ window: size, screen: size })
   await render(<App />)
 
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Center' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Close training settings' }))
+  expect(StyleSheet.flatten(screen.getByTestId('mobile-feedback').props.style)).toMatchObject({ flex: 1, minHeight: 88 })
   await fireEvent(screen.getByTestId('mobile-content'), 'layout', { nativeEvent: { layout: { width: 320, height: 512 } } })
   expect(StyleSheet.flatten(screen.getByTestId('mobile-board').props.style).width).toBe(320)
+  expect(StyleSheet.flatten(screen.getByTestId('mobile-board-spacer', { includeHiddenElements: true }).props.style).height).toBe(2)
   await fireEvent(screen.getByTestId('mobile-content'), 'layout', { nativeEvent: { layout: { width: 320, height: 424 } } })
   expect(StyleSheet.flatten(screen.getByTestId('mobile-board').props.style).width).toBe(276)
+  expect(StyleSheet.flatten(screen.getByTestId('mobile-board-spacer', { includeHiddenElements: true }).props.style).height).toBe(0)
+  await fireEvent(screen.getByTestId('mobile-content'), 'layout', { nativeEvent: { layout: { width: 390, height: 788 } } })
+  expect(StyleSheet.flatten(screen.getByTestId('mobile-board').props.style).width).toBe(390)
+  expect(StyleSheet.flatten(screen.getByTestId('mobile-board-spacer', { includeHiddenElements: true }).props.style).height).toBe(105)
+})
+
+test('mobile board position defaults to top and persists independently', async () => {
+  const size = { width: 375, height: 812, scale: 1, fontScale: 1 }
+  Dimensions.set({ window: size, screen: size })
+  const { unmount } = await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  expect(screen.getByRole('radio', { name: 'Top', checked: true })).toBeTruthy()
+  await fireEvent.press(screen.getByRole('radio', { name: 'Center' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Close training settings' }))
+  expect(screen.getByTestId('mobile-board-spacer', { includeHiddenElements: true })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'f1, white rook' })).toBeTruthy()
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith('chesstrainer.boardPosition', 'center'))
+  await unmount()
+
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  await waitFor(() => expect(screen.getByRole('radio', { name: 'Center', checked: true })).toBeTruthy())
+  await fireEvent.press(screen.getByRole('radio', { name: 'Français' }))
+  expect(screen.getByRole('radio', { name: 'Au milieu', checked: true })).toBeTruthy()
+  await fireEvent.press(screen.getByRole('radio', { name: 'En haut' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Fermer les paramètres' }))
+  expect(screen.queryByTestId('mobile-board-spacer', { includeHiddenElements: true })).toBeNull()
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith('chesstrainer.boardPosition', 'top'))
+})
+
+test('a late saved board position cannot override a new choice', async () => {
+  const size = { width: 375, height: 812, scale: 1, fontScale: 1 }
+  Dimensions.set({ window: size, screen: size })
+  let resolve: (value: string | null) => void = () => { throw new Error('Storage read not started') }
+  jest.mocked(AsyncStorage.getItem).mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Center' }))
+  await act(() => resolve('top'))
+  expect(screen.getByRole('radio', { name: 'Center', checked: true })).toBeTruthy()
+})
+
+test('saves rapid board position changes in order', async () => {
+  const size = { width: 375, height: 812, scale: 1, fontScale: 1 }
+  Dimensions.set({ window: size, screen: size })
+  let finishWrite: () => void = () => { throw new Error('Storage write not started') }
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  jest.mocked(AsyncStorage.setItem).mockClear()
+  jest.mocked(AsyncStorage.setItem).mockImplementationOnce(() => new Promise((resolve) => { finishWrite = resolve }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Center' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Top' }))
+  expect(AsyncStorage.setItem).toHaveBeenCalledTimes(1)
+  await act(() => finishWrite())
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenLastCalledWith('chesstrainer.boardPosition', 'top'))
+  expect(await AsyncStorage.getItem('chesstrainer.boardPosition')).toBe('top')
+})
+
+test('does not show the mobile board position setting on desktop', async () => {
+  const size = { width: 1280, height: 812, scale: 1, fontScale: 1 }
+  Dimensions.set({ window: size, screen: size })
+  await render(<App />)
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  expect(screen.queryByRole('radiogroup', { name: 'Board position' })).toBeNull()
+})
+
+test('reports board position read and write failures', async () => {
+  const size = { width: 375, height: 812, scale: 1, fontScale: 1 }
+  Dimensions.set({ window: size, screen: size })
+  jest.mocked(AsyncStorage.getItem).mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('Read failed'))
+  const log = jest.spyOn(console, 'error').mockImplementation(() => {})
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {})
+  await render(<App />)
+  await waitFor(() => expect(alert).toHaveBeenCalledWith('Unable to read the saved board position', 'Please try again.'))
+  jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error('Write failed'))
+  await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
+  await fireEvent.press(screen.getByRole('radio', { name: 'Top' }))
+  await waitFor(() => expect(alert).toHaveBeenCalledWith('Unable to save the board position', 'Please try again.'))
+  alert.mockRestore()
+  log.mockRestore()
+})
+
+test.each([375, 1280])('slides moves briefly and cancels animation on restart at width %i', async (width) => {
+  jest.useFakeTimers()
+  const timing = controlAnimations()
+  const size = { width, height: 812, scale: 1, fontScale: 1 }
+  Dimensions.set({ window: size, screen: size })
+  await render(<App />)
+  await act(() => screen.getByTestId('chess-board').props.onLayout({ nativeEvent: { layout: { width: 320, height: 320 } } }))
+  await fireEvent.press(screen.getByRole('button', { name: 'f1, white rook' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'f8, empty, legal move' }))
+  expect(timing).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ duration: 180, useNativeDriver: true }))
+  expect(screen.getByTestId('sliding-piece-f1-f8')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'f8, white rook' })).toBeTruthy()
+  await act(() => jest.advanceTimersByTime(250))
+  expect(screen.queryByTestId('sliding-piece-f1-f8')).toBeNull()
+
+  await fireEvent.press(screen.getByRole('button', { name: 'Restart this puzzle' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'f1, white rook' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'f8, empty, legal move' }))
+  expect(screen.getByTestId('sliding-piece-f1-f8')).toBeTruthy()
+  await fireEvent.press(screen.getByRole('button', { name: 'Restart this puzzle' }))
+  expect(screen.queryByTestId('sliding-piece-f1-f8')).toBeNull()
+  await act(() => jest.advanceTimersByTime(250))
+  expect(screen.getByRole('button', { name: 'f1, white rook' })).toBeTruthy()
+  timing.mockRestore()
+})
+
+test('slides a black promotion and the following opponent capture', async () => {
+  jest.useFakeTimers()
+  const timing = controlAnimations()
+  mockNextPuzzle(underpromotionPuzzle)
+  const size = { width: 375, height: 812, scale: 1, fontScale: 1 }
+  Dimensions.set({ window: size, screen: size })
+  await render(<App />)
+  await act(() => screen.getByTestId('chess-board').props.onLayout({ nativeEvent: { layout: { width: 320, height: 320 } } }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Next puzzle' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'c2, black pawn' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'c1, empty, legal move' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Promote to knight' }))
+  const sliding = screen.getByTestId('sliding-piece-c2-c1')
+  expect(StyleSheet.flatten(sliding.props.style)).toMatchObject({ left: 201.6, top: 1.6 })
+  await act(() => jest.advanceTimersByTime(550))
+  expect(screen.getByTestId('sliding-piece-e2-d1')).toBeTruthy()
+  await act(() => jest.advanceTimersByTime(250))
+  expect(screen.queryByTestId('sliding-piece-e2-d1')).toBeNull()
+  timing.mockRestore()
+})
+
+test('slides both king and rook during castling', async () => {
+  jest.useFakeTimers()
+  const timing = controlAnimations()
+  mockNextPuzzle({
+    id: 'castling-fixture', themes: ['castling'], fen: '4k3/8/8/8/8/8/8/4K2R b K - 0 1',
+    moves: ['e8e7', 'e1g1'], rating: 1000,
+  })
+  const size = { width: 375, height: 812, scale: 1, fontScale: 1 }
+  Dimensions.set({ window: size, screen: size })
+  await render(<App />)
+  await act(() => screen.getByTestId('chess-board').props.onLayout({ nativeEvent: { layout: { width: 320, height: 320 } } }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Next puzzle' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'e1, white king' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'g1, empty, legal move' }))
+  expect(screen.getByTestId('sliding-piece-e1-g1')).toBeTruthy()
+  expect(screen.getByTestId('sliding-piece-h1-f1')).toBeTruthy()
+  await act(() => jest.advanceTimersByTime(180))
+  expect(screen.queryByTestId('sliding-piece-e1-g1')).toBeNull()
+  expect(screen.queryByTestId('sliding-piece-h1-f1')).toBeNull()
+  expect(screen.getByRole('button', { name: 'f1, white rook' })).toBeTruthy()
+  timing.mockRestore()
 })
 
 test.each([375, 1280])('collapses theme groups independently without changing selection at width %i', async (width) => {
@@ -97,7 +616,7 @@ test.each([375, 1280])('collapses theme groups independently without changing se
 test('searches collapsed Lichess themes and supports bulk selection', async () => {
   await render(<App />)
   await fireEvent.press(screen.getByRole('button', { name: 'Your training' }))
-  expect(screen.getAllByRole('checkbox')).toHaveLength(categoryGroups[0].themes.length + 3)
+  expect(screen.getAllByRole('checkbox')).toHaveLength(categoryGroups[0].themes.length + 4)
   await fireEvent.changeText(screen.getByLabelText('Search puzzle themes'), 'under')
   expect(screen.getByRole('checkbox', { name: 'Underpromotion' })).toBeTruthy()
   expect(screen.getByRole('button', { name: 'Special moves' }).props.accessibilityState.expanded).toBe(true)
@@ -115,7 +634,7 @@ test('searches collapsed Lichess themes and supports bulk selection', async () =
 
 test('offers all four pieces when promoting instead of forcing a queen', async () => {
   jest.useFakeTimers()
-  jest.mocked(createPuzzlePicker).mockReturnValueOnce(async () => underpromotionPuzzle)
+  mockNextPuzzle(underpromotionPuzzle)
   await render(<App />)
   await fireEvent.press(screen.getByRole('button', { name: 'Next puzzle' }))
   await fireEvent.press(screen.getByRole('button', { name: 'c2, black pawn' }))

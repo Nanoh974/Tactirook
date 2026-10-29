@@ -4,12 +4,41 @@ ChessTrainer is an iOS, Android and web app built with React Native and Expo.
 It includes puzzles, category filters, move hints, tap and drag controls,
 opponent replies, restart and next-puzzle actions. The training menu contains
 category filters, options to hide the current puzzle type or rating, and an
-optional automatic advance 0.5 seconds after solving a puzzle. These settings
-apply for the current session and automatic advance is off by default. Hiding
+optional automatic advance 0.5 seconds after solving a puzzle. These training
+settings apply for the current session and automatic advance is off by default. Hiding
 the type also hides the move count so that it does not give away the length
 of the puzzle.
-On mobile, the board and puzzle controls fit on one screen; the board shrinks
-when necessary on short screens, and credits remain available in the menu.
+The first puzzle is random too. Seen puzzles are remembered on the device and
+avoided across sessions and theme changes until all puzzles matching the
+selected themes have been seen. Then seen puzzles are eligible again.
+The training menu shows the number of distinct puzzles seen, offers a reset
+button, and lets you allow seen puzzles in the draw at any time. This choice
+is saved independently. A reset clears the count even for the current puzzle;
+it is counted again only if drawn later. The memory is tied to the installed
+library snapshot and starts fresh if the puzzle library is replaced.
+On mobile, the board sits at the top by default; the settings can instead place
+it slightly above center when space permits. This choice is saved on the device.
+The board and puzzle controls fit on one screen, and the board shrinks when
+necessary on short screens. The settings menu fills the screen.
+The menu's header and close button remain visible while scrolling on mobile
+and web. Credits remain available in the mobile menu.
+Played moves and opponent replies slide quickly to their destination; incorrect
+moves still reset immediately.
+
+The appearance setting switches between light and dark themes (light by
+default). The board color is independent: brown/cream is the default, with
+blue and green palettes also available. Both choices are saved on the device.
+
+## Languages
+
+The interface, puzzle themes and accessibility labels are available in
+English, French, Spanish, Japanese, Simplified Chinese, Hindi and Italian.
+Initially the app uses the first supported device language, or English if none
+is supported. Choose another language in the training settings; that choice
+is saved on the device and restored after restarting the app. Theme search
+accepts both the current language and the English theme name.
+Interface translations are maintained in separate language files under
+[`src/i18n/`](./src/i18n/); the English file defines the required message keys.
 
 ## Run
 
@@ -73,10 +102,10 @@ The approximately **30 MiB** pack is in `assets/puzzles/`: gzip-compressed
 JSON files with a `.puzzles` extension, 500 puzzles per shard, plus a theme
 index. Metro registers these as assets rather than JavaScript modules.
 Only the selected shard is read; at most four decoded shards are cached.
-The theme index is loaded on demand when filtering. The initial puzzle is
-small enough to be in the manifest, so startup does not fetch the whole pack.
-Puzzle order is shuffled without replacement until a selection's pool is
-exhausted; changing themes starts a new pool.
+The theme index is loaded on demand when filtering. Startup draws a random
+puzzle and loads its shard without fetching the whole pack. Puzzle order is
+shuffled without replacement until a selection's pool is exhausted; changing
+themes starts a new pool.
 
 The same files work on iOS, Android and static web hosting, including GitHub
 Pages. Native release bundles include the assets; Expo Go downloads needed

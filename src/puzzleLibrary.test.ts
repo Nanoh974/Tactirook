@@ -91,3 +91,50 @@ test('reads packaged native files instead of fetching web URLs', async () => {
   expect(globalThis.fetch).not.toHaveBeenCalled()
   expect(nativeRead).toHaveBeenCalled()
 })
+
+test('the first draw is randomized across the entire library', async () => {
+  jest.replaceProperty(Platform, 'OS', 'web')
+  const random = jest.spyOn(Math, 'random').mockReturnValue(0)
+  let first = -1
+  await createPuzzlePicker()(categories.map(({ id }) => id), '', new Set(), (index) => { first = index })
+  random.mockReturnValue(0.999999)
+  let second = -1
+  await createPuzzlePicker()(categories.map(({ id }) => id), '', new Set(), (index) => { second = index })
+  expect([first, second]).toEqual([1, 0])
+})
+
+test('avoids seen puzzles across theme changes, then permits repeats when exhausted', async () => {
+  jest.replaceProperty(Platform, 'OS', 'web')
+  const pick = createPuzzlePicker()
+  const seen = new Set<number>([0, 1, 2, 3, 4, 5, 6])
+  let index = -1
+  const last = await pick(categories.map(({ id }) => id), '', seen, (value) => { index = value })
+  expect(index).toBe(7)
+  seen.add(index)
+  const repeat = await pick(['fork'], last.id, seen, (value) => { index = value })
+  expect(repeat.themes).toContain('fork')
+  expect(repeat.id).not.toBe(last.id)
+  seen.delete(6)
+  await pick(['fork'], repeat.id, seen, (value) => { index = value })
+  expect(index).toBe(6)
+})
+
+test('allowing seen puzzles makes them eligible even if unseen puzzles remain', async () => {
+  jest.replaceProperty(Platform, 'OS', 'web')
+  jest.spyOn(Math, 'random').mockReturnValue(0.999999)
+  let index = -1
+  await createPuzzlePicker()(categories.map(({ id }) => id), '', new Set(), (value) => { index = value })
+  expect(index).toBe(0)
+})
+
+test('avoids repeating the current puzzle when more than one unseen puzzle is available', async () => {
+  jest.replaceProperty(Platform, 'OS', 'web')
+  jest.spyOn(Math, 'random').mockReturnValue(0.999999)
+  const pick = createPuzzlePicker()
+  const first = await pick(categories.map(({ id }) => id), '')
+  const next = await createPuzzlePicker()(categories.map(({ id }) => id), first.id)
+  expect(next.id).not.toBe(first.id)
+  const onlyUnseen = new Set(Array.from({ length: 7 }, (_, index) => index + 1))
+  const same = await createPuzzlePicker()(categories.map(({ id }) => id), first.id, onlyUnseen)
+  expect(same.id).toBe(first.id)
+})

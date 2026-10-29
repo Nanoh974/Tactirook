@@ -18,7 +18,13 @@
       "baseUrl": "/ChessTrainer"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": ["en", "fr", "es", "ja", "zh-Hans", "hi", "it"]
+        }
+      ]
     ]
   }
 }

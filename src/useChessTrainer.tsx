@@ -1,9 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Chess, type PieceSymbol, type Square } from 'chess.js'
+import { Chess, type Color, type Move, type PieceSymbol, type Square } from 'chess.js'
 import { categories, type Category, type Puzzle } from './puzzles'
 import { createPuzzlePicker, initialPuzzle } from './puzzleLibrary'
+import { createPreferenceWriter } from './preferences'
+import { readSeenPuzzles, seenPuzzlesKey, serializeSeenPuzzles } from './seenPuzzles'
 
 type Status = 'playing' | 'replying' | 'wrong' | 'success'
+export type PieceMotion = { from: Square; to: Square; piece: { color: Color; type: PieceSymbol } }
+export type MoveMotion = { id: number; pieces: PieceMotion[] }
+
+function moveMotions(move: Move): PieceMotion[] {
+  const motions: PieceMotion[] = [{
+    from: move.from,
+    to: move.to,
+    piece: { color: move.color, type: move.promotion ?? move.piece },
+  }]
+  const rank = move.color === 'w' ? '1' : '8'
+  if (move.isKingsideCastle()) {
+    motions.push({ from: `h${rank}` as Square, to: `f${rank}` as Square, piece: { color: move.color, type: 'r' } })
+  } else if (move.isQueensideCastle()) {
+    motions.push({ from: `a${rank}` as Square, to: `d${rank}` as Square, piece: { color: move.color, type: 'r' } })
+  }
+  return motions
+}
 
 function setup(puzzle: Puzzle) {
   const game = new Chess(puzzle.fen)
@@ -11,25 +30,38 @@ function setup(puzzle: Puzzle) {
   return game.fen()
 }
 
-export function useChessTrainer() {
+export function useChessTrainer(allowSeen = false, reportMemoryError?: (kind: 'load' | 'save') => void, ready = true) {
   const [selectedCategories, setSelectedCategories] = useState<Category[]>(categories.map(({ id }) => id))
   const [puzzle, setPuzzle] = useState(initialPuzzle)
   const [fen, setFen] = useState(() => setup(initialPuzzle))
   const [step, setStep] = useState(1)
   const [status, setStatus] = useState<Status>('playing')
   const [lastMove, setLastMove] = useState<[Square, Square] | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [motion, setMotion] = useState<MoveMotion | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [hasPuzzle, setHasPuzzle] = useState(false)
+  const [seenCount, setSeenCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const request = useRef(0)
-  const pickPuzzle = useMemo(() => createPuzzlePicker(), [])
+  const motionId = useRef(0)
+  const [picker] = useState(() => ({ current: createPuzzlePicker() }))
+  const seen = useRef(new Set<number>())
+  const readMemory = useRef<Promise<void> | null>(null)
+  const hasPuzzleRef = useRef(false)
+  const selectedRef = useRef(selectedCategories)
+  const allowSeenRef = useRef(allowSeen)
+  allowSeenRef.current = allowSeen
+  const reportErrorRef = useRef(reportMemoryError)
+  reportErrorRef.current = reportMemoryError
+  const writeMemory = useMemo(() => createPreferenceWriter(), [])
 
   const game = useMemo(() => new Chess(fen), [fen])
   const side = useMemo(() => new Chess(setup(puzzle)).turn(), [puzzle])
   const playerMoves = Math.ceil((puzzle.moves.length - 1) / 2)
   const movesPlayed = Math.floor(step / 2)
   const hasFocus = selectedCategories.length > 0
-  const enabled = hasFocus && !loading && !error
+  const enabled = hasPuzzle && hasFocus && !loading && !error
 
   function clearReply() {
     if (timer.current !== null) {
@@ -43,6 +75,26 @@ export function useChessTrainer() {
     if (timer.current !== null) clearTimeout(timer.current)
   }, [])
 
+  useEffect(() => {
+    if (ready && selectedRef.current.length) void loadNext(selectedRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready])
+
+  function persistMemory() {
+    const value = serializeSeenPuzzles(seen.current)
+    void writeMemory(seenPuzzlesKey, value).catch((cause: unknown) => {
+      console.error('Unable to save seen puzzles', cause)
+      reportErrorRef.current?.('save')
+    })
+  }
+
+  function resetSeenPuzzles() {
+    seen.current = new Set()
+    setSeenCount(0)
+    picker.current = createPuzzlePicker()
+    persistMemory()
+  }
+
   function resetPosition(nextPuzzle = puzzle, nextStatus: Status = 'playing') {
     const position = setup(nextPuzzle)
     clearReply()
@@ -51,6 +103,7 @@ export function useChessTrainer() {
     setStep(1)
     setStatus(nextStatus)
     setLastMove(null)
+    setMotion(null)
   }
 
   function restart() {
@@ -64,11 +117,33 @@ export function useChessTrainer() {
     if (!selected.length) return
     const currentRequest = ++request.current
     clearReply()
+    setMotion(null)
     setLoading(true)
     setError(null)
     try {
-      const next = await pickPuzzle(selected, puzzle.id)
+      if (!readMemory.current) {
+        readMemory.current = readSeenPuzzles().then((saved) => {
+          seen.current = saved
+          setSeenCount(saved.size)
+        }).catch((cause: unknown) => {
+          readMemory.current = null
+          console.error('Unable to read seen puzzles', cause)
+          reportErrorRef.current?.('load')
+          throw cause
+        })
+      }
+      await readMemory.current
       if (request.current !== currentRequest) return
+      let index: number | undefined
+      const next = await picker.current(selected, hasPuzzleRef.current ? puzzle.id : '', allowSeenRef.current ? new Set() : seen.current, (value) => { index = value })
+      if (request.current !== currentRequest) return
+      if (index !== undefined && !seen.current.has(index)) {
+        seen.current.add(index)
+        setSeenCount(seen.current.size)
+        persistMemory()
+      }
+      hasPuzzleRef.current = true
+      setHasPuzzle(true)
       resetPosition(next)
     } catch (cause: unknown) {
       if (request.current !== currentRequest) return
@@ -83,9 +158,10 @@ export function useChessTrainer() {
     request.current++
     clearReply()
     setSelectedCategories(next)
+    selectedRef.current = next
     setLoading(false)
     setError(null)
-    if (next.length && !puzzle.themes.some((theme) => next.includes(theme))) {
+    if (ready && next.length && (!hasPuzzleRef.current || !puzzle.themes.some((theme) => next.includes(theme)))) {
       void loadNext(next)
     } else if (status === 'replying') {
       resetPosition()
@@ -113,6 +189,7 @@ export function useChessTrainer() {
 
     setFen(next.fen())
     setLastMove([from, to])
+    setMotion({ id: ++motionId.current, pieces: moveMotions(candidate) })
     if (alternativeMate || step === puzzle.moves.length - 1) {
       setStatus('success')
       return
@@ -123,9 +200,10 @@ export function useChessTrainer() {
       const reply = puzzle.moves[step + 1]
       const replyFrom = reply.slice(0, 2) as Square
       const replyTo = reply.slice(2, 4) as Square
-      next.move({ from: replyFrom, to: replyTo, promotion: reply[4] })
+      const replyMove = next.move({ from: replyFrom, to: replyTo, promotion: reply[4] })
       setFen(next.fen())
       setLastMove([replyFrom, replyTo])
+      setMotion({ id: ++motionId.current, pieces: moveMotions(replyMove) })
       setStep(step + 2)
       setStatus('playing')
       timer.current = null
@@ -133,7 +211,7 @@ export function useChessTrainer() {
   }
 
   return {
-    puzzle, game, side, status, lastMove, selectedCategories, enabled, hasFocus, loading, error,
+    puzzle, game, side, status, lastMove, motion, selectedCategories, enabled, hasFocus, hasPuzzle, loading, error, seenCount, resetSeenPuzzles,
     playerMoves, movesPlayed, attemptMove, toggleCategory, selectCategories,
     nextPuzzle: () => { void loadNext() },
     retry: () => { void loadNext() },

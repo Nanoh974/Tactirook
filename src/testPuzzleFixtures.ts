@@ -20,9 +20,11 @@ export const underpromotionPuzzle: Puzzle = {
 }
 
 export function createFixturePicker() {
-  return async (selected: string[], avoidId: string) => {
+  return async (selected: string[], avoidId: string, _seen?: ReadonlySet<number>, onSelected?: (index: number) => void) => {
     const eligible = puzzles.filter((puzzle) => puzzle.themes.some((theme) => selected.includes(theme)))
     const current = puzzles.findIndex((puzzle) => puzzle.id === avoidId)
-    return eligible.find((puzzle) => puzzles.indexOf(puzzle) > current) ?? eligible[0]
+    const puzzle = eligible.find((item) => puzzles.indexOf(item) > current) ?? eligible[0]
+    onSelected?.(puzzles.indexOf(puzzle))
+    return puzzle
   }
 }
