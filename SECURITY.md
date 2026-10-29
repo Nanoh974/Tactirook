@@ -9,7 +9,7 @@ Older commits and independently distributed forks may not receive fixes.
 ## Report privately
 
 Please use GitHub's
-[private vulnerability reporting](https://github.com/Solenia13/ChessTrainer/security/advisories/new).
+[private vulnerability reporting](https://github.com/Nanoh974/Tactirook/security/advisories/new).
 Do not disclose exploit details, credentials or sensitive data in a public issue.
 
 Include:

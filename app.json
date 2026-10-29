@@ -15,7 +15,7 @@
       "favicon": "./assets/icon.png"
     },
     "experiments": {
-      "baseUrl": "/ChessTrainer"
+      "baseUrl": "/Tactirook"
     },
     "plugins": [
       "expo-font",

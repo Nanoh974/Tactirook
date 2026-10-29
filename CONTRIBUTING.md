@@ -57,7 +57,7 @@ guidance for upgrades rather than independently bumping every package.
 
 ## Review and project direction
 
-The maintainer, [Solenia13](https://github.com/Solenia13), handles project
+The maintainer, [Nanoh974](https://github.com/Nanoh974), handles project
 direction, reviews and official releases. A contribution does not guarantee
 acceptance; discuss major changes first to avoid wasted work.
 

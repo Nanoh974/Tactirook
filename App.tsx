@@ -135,7 +135,7 @@ function TrainingApp() {
     <View style={[styles.credits, compact && styles.mobileCredits]}>
       <Text style={styles.footerText}>{t('puzzlesFrom')}</Text>
       <CreditLink url="https://lichess.org" label="Lichess" textStyle={[styles.footerText, styles.link]} />
-      <CreditLink url="https://github.com/Solenia13/ChessTrainer" label={t('sourceAndLicenses')} textStyle={[styles.footerText, styles.link]} />
+      <CreditLink url="https://github.com/Nanoh974/Tactirook" label={t('sourceAndLicenses')} textStyle={[styles.footerText, styles.link]} />
     </View>
   )
 

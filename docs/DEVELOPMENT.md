@@ -77,7 +77,7 @@ npx expo export --platform all --output-dir dist
 CI checks generated artwork for drift and validates the web export.
 Only a successful `main` run deploys to GitHub Pages through the
 `github-pages` environment. In repository Settings > Pages, the source must
-be **GitHub Actions**. The project path is `/ChessTrainer`; changing the repo
+be **GitHub Actions**. The project path is `/Tactirook`; changing the repo
 name or hosting path requires updating Expo's `experiments.baseUrl`.
 
 The full puzzle verifier is deliberately a separate manual workflow because
