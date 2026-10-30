@@ -19,6 +19,7 @@ test.each(sources)('Signature %s preserves every source pixel and only recolors 
   for (const color of ['w', 'b'] as const) {
     const xml = pieceXml.signature[color][piece]
     const document = new DOMParser().parseFromString(xml, 'image/svg+xml')
+    if (!document.documentElement) throw new Error('Missing SVG root element')
     expect(document.documentElement.getAttribute('viewBox')).toBe('0 0 32 32')
     expect(document.documentElement.getAttribute('shape-rendering')).toBe('crispEdges')
     expect(xml).not.toMatch(/<image\b|data:image|base64/)

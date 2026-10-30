@@ -42,7 +42,7 @@ test.each(['signature', 'atelier'] as const)('%s displays the original artwork a
 
 test.each(pieceSetNames)('%s preserves all twelve source drawings and resolves native SVG styling', (set) => {
   const parser = new DOMParser()
-  const shapes = (document: Document) => Array.from(document.getElementsByTagName('*'))
+  const shapes = (document: ReturnType<typeof parser.parseFromString>) => Array.from(document.getElementsByTagName('*'))
     .filter((element) => ['path', 'ellipse', 'circle'].includes(element.tagName))
     .map((element) => ['d', 'cx', 'cy', 'rx', 'ry', 'r', 'transform'].map((attribute) => element.getAttribute(attribute)))
   for (const color of ['w', 'b'] as const) {
@@ -52,6 +52,7 @@ test.each(pieceSetNames)('%s preserves all twelve source drawings and resolves n
       const xml = pieceXml[set][color][piece]
       const original = parser.parseFromString(source, 'image/svg+xml')
       const normalized = parser.parseFromString(xml, 'image/svg+xml')
+      if (!original.documentElement || !normalized.documentElement) throw new Error('Missing SVG root element')
       expect(shapes(normalized)).toEqual(shapes(original))
       expect(normalized.documentElement.getAttribute('viewBox')).toBe(original.documentElement.getAttribute('viewBox'))
       expect(xml).not.toMatch(/<(?:style|script|image)\b|\s(?:class|style|(?:xlink:)?href)=/)

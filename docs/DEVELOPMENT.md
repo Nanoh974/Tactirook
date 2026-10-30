@@ -76,6 +76,9 @@ the same geometry. The vectorizer rejects unsupported dimensions, partial
 transparency and unmapped colors rather than silently changing the artwork.
 
 Commit source artwork, generated SVGs and `src/pieceXml.ts` together.
+When changing artwork or its generators, run the relevant commands above and
+check the resulting diff before committing. CI does not regenerate or check
+these files for drift.
 Third-party source SVGs stay unchanged; the bundler inlines CSS/gradient
 inheritance and prefixes IDs for React Native/web compatibility.
 Preserve the licenses described in [third-party notices](../THIRD_PARTY_NOTICES.md).
@@ -93,7 +96,7 @@ npm test
 npx expo export --platform all --output-dir dist
 ```
 
-CI checks generated artwork for drift and validates the web export.
+CI validates the web export but does not regenerate artwork or licenses.
 Only a successful `main` run deploys to GitHub Pages through the
 `github-pages` environment. In repository Settings > Pages, the source must
 be **GitHub Actions**. CI sets `TACTIROOK_WEB_BASE_URL=/Tactirook` for the
