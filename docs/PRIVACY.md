@@ -43,5 +43,9 @@ preferences. Clear site storage on web to remove all local settings. On native
 platforms, use the operating system's app-storage controls; uninstall/restore
 behavior can depend on backups.
 
-Do not include personal data in public bug reports. Report security/privacy
-vulnerabilities through the [security policy](../SECURITY.md).
+## Contact
+
+For privacy questions, open a [GitHub issue](https://github.com/Nanoh974/Tactirook/issues)
+to request a private contact channel. Issues are public: do not include
+personal or sensitive information. Report security/privacy vulnerabilities
+through the [security policy](../SECURITY.md).

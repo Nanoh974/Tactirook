@@ -13,6 +13,25 @@ Run `npm run web`, `npm run ios` or `npm run android` for the relevant target.
 Native emulators require their platform tools; iOS simulation requires macOS
 and Xcode. Expo Go must support the SDK used by the project.
 
+## Local Xcode project
+
+Keep the generated native project in `ios/` at the repository root, not in a
+temporary session directory. With Node.js 24 active and CocoaPods installed:
+
+```sh
+npx expo prebuild --platform ios --no-install
+cd ios
+pod install
+open Tactirook.xcworkspace
+```
+
+The generated `ios/` and `android/` directories are already ignored by Git.
+Keep reproducible native configuration in the Expo config and config plugins;
+local changes in Xcode, including signing settings, are not versioned. Avoid
+`prebuild --clean` unless you intend to regenerate the native project and have
+preserved any local settings you need. After relocating an existing native
+project, rerun `pod install` from `ios/` to refresh dependency paths.
+
 ## Project layout
 
 | Location | Purpose |
@@ -77,17 +96,45 @@ npx expo export --platform all --output-dir dist
 CI checks generated artwork for drift and validates the web export.
 Only a successful `main` run deploys to GitHub Pages through the
 `github-pages` environment. In repository Settings > Pages, the source must
-be **GitHub Actions**. The project path is `/Tactirook`; changing the repo
-name or hosting path requires updating Expo's `experiments.baseUrl`.
+be **GitHub Actions**. CI sets `TACTIROOK_WEB_BASE_URL=/Tactirook` for the
+web export; changing the repo name or hosting path requires updating that value.
+To reproduce the hosted export locally:
+
+```sh
+TACTIROOK_WEB_BASE_URL=/Tactirook npx expo export --platform web
+```
+
+Leave this variable unset for native builds and multi-platform exports.
+The default base path is empty: applying the web hosting prefix to a native
+Release build can cause asset paths to collide with the app executable.
 
 The full puzzle verifier is deliberately a separate manual workflow because
 it replays the entire database. Run it when changing puzzle data or import logic.
+
+## iOS TestFlight builds
+
+`.github/workflows/ios-testflight.yml` builds, signs and uploads the iOS app
+to TestFlight when a `v*` tag is pushed. The tag must match `expo.version` in
+`app.json` (for example `v1.0.0`); the build number is the workflow run number.
+App Store submission stays manual in App Store Connect.
+
+The job uses the `testflight` environment, restricted to `v*` tags, with these
+secrets: `BUILD_CERTIFICATE_BASE64`, `P12_PASSWORD`,
+`BUILD_PROVISION_PROFILE_BASE64` (App Store profile named `Tactirook AppStore`),
+`KEYCHAIN_PASSWORD`, `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID` and
+`ASC_KEY_P8_BASE64`. Never commit these files or values. The distribution
+certificate and profile expire yearly; renew them and update the secrets.
+
+```sh
+git tag v1.0.0 && git push origin v1.0.0
+```
 
 ## Before a mobile store release
 
 The native apps are not published yet. Before release:
 
-- Choose final app identifiers and set up signing without committing credentials.
+- The iOS bundle identifier is `io.github.nanoh974.tactirook`; choose the
+  Android identifier and set up signing without committing credentials.
 - Build and test on real iOS/Android devices, including offline asset loading,
   saved preferences, large text, reduced motion, VoiceOver and TalkBack.
 - Review dependency/platform licenses and include required notices and source

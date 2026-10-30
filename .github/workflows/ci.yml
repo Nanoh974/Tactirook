@@ -37,6 +37,8 @@ jobs:
       - run: npm run lint
       - run: npm test -- --ci
       - name: Export web preview
+        env:
+          TACTIROOK_WEB_BASE_URL: /Tactirook
         run: npx expo export --platform web
       - name: Upload Pages artifact
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
