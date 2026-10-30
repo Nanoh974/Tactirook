@@ -126,6 +126,17 @@ secrets: `BUILD_CERTIFICATE_BASE64`, `P12_PASSWORD`,
 certificate and profile expire yearly; renew them and update the secrets.
 
 ```sh
+npm run release:ios            # 1.0.0 → 1.0.1
+npm run release:ios -- minor   # 1.0.0 → 1.1.0 (also: major, or an explicit X.Y.Z)
+npm run release:ios -- --dry-run
+```
+
+The script must start from an up-to-date, clean `main` and needs the GitHub CLI
+(`gh auth login`). It bumps `app.json`/`package.json`, opens a `release/vX.Y.Z`
+PR, waits for the required checks, merges it, tags the merge commit and follows
+the TestFlight run. To tag by hand instead:
+
+```sh
 git tag v1.0.0 && git push origin v1.0.0
 ```
 

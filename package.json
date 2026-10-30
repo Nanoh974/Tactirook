@@ -59,7 +59,8 @@
     "generate:licenses": "node scripts/generate-project-licenses.cjs && npm run generate:pieces",
     "vectorize:pieces": "node scripts/vectorize-signature-pieces.cjs && npm run generate:pieces",
     "import:puzzles": "node scripts/import-puzzles.mjs",
-    "verify:puzzles": "node scripts/verify-puzzles.mjs"
+    "verify:puzzles": "node scripts/verify-puzzles.mjs",
+    "release:ios": "node scripts/release-ios.mjs"
   },
   "jest": {
     "preset": "jest-expo"
