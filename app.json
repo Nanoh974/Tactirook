@@ -6,6 +6,7 @@
     "icon": "./assets/icon-app.png",
     "userInterfaceStyle": "light",
     "ios": {
+      "bundleIdentifier": "io.github.nanoh974.tactirook",
       "supportsTablet": true
     },
     "android": {
@@ -13,9 +14,6 @@
     },
     "web": {
       "favicon": "./assets/icon.png"
-    },
-    "experiments": {
-      "baseUrl": "/Tactirook"
     },
     "plugins": [
       "expo-font",
