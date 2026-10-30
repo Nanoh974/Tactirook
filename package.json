@@ -34,7 +34,7 @@
     "react-native-web": "^0.21.4"
   },
   "devDependencies": {
-    "@xmldom/xmldom": "^0.8.15",
+    "@xmldom/xmldom": "^0.9.12",
     "@testing-library/react-native": "^14.1.0",
     "@types/jest": "30.0.0",
     "@types/pngjs": "^6.0.5",

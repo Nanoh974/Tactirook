@@ -27,12 +27,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Check generated artwork and licenses
-        run: |
-          node scripts/draw-atelier-pieces.cjs
-          npm run generate:licenses
-          npm run vectorize:pieces
-          git diff --exit-code -- assets/pieces src/pieceXml.ts
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test -- --ci

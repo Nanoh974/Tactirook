@@ -1,18 +1,13 @@
 // SPDX-License-Identifier: MPL-2.0
 const fs = require('node:fs')
 const path = require('node:path')
-const { DOMParser, XMLSerializer } = require('@xmldom/xmldom')
+const { XMLSerializer } = require('@xmldom/xmldom')
+const { parseSvg } = require('./parse-svg.cjs')
 
 const root = path.join(__dirname, '..')
 // Inline the upstream CSS and gradient inheritance for native SvgXml support.
 function normalizeSvg(source, prefix) {
-  const doc = new DOMParser({
-    errorHandler: {
-      warning: (message) => { throw new Error(message) },
-      error: (message) => { throw new Error(message) },
-      fatalError: (message) => { throw new Error(message) },
-    },
-  }).parseFromString(source, 'image/svg+xml')
+  const doc = parseSvg(source)
   const rules = []
   for (const style of Array.from(doc.getElementsByTagName('style'))) {
     const css = style.textContent
@@ -28,13 +23,13 @@ function normalizeSvg(source, prefix) {
   })
   const elements = Array.from(doc.getElementsByTagName('*'))
   for (const element of elements) {
-    const classes = element.getAttribute('class').split(/\s+/)
+    const classes = (element.getAttribute('class') ?? '').split(/\s+/)
     for (const [name, text] of rules) {
       if (classes.includes(name)) {
         for (const [key, value] of declarations(text)) element.setAttribute(key, value)
       }
     }
-    for (const [key, value] of declarations(element.getAttribute('style'))) {
+    for (const [key, value] of declarations(element.getAttribute('style') ?? '')) {
       if (key !== 'color-scheme') element.setAttribute(key, value)
     }
     element.removeAttribute('style')
