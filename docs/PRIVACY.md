@@ -1,8 +1,9 @@
 # Privacy and data behavior
 
+[Français](./PRIVACY.fr.md)
+
 This document describes the current source, not a guarantee about future
-releases or third-party forks. Tactirook's mobile store releases are still in
-preparation; their final privacy declarations must be checked before publication.
+releases or third-party forks.
 
 ## Data kept on your device
 
